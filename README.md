@@ -6,7 +6,7 @@
 
 > A beam through the noise.
 
-**Pharos** is a self-hosted, open-source Feedly alternative. It pulls from
+**Pharos** is a self-hosted, open-source AI-enabled news aggregator. It pulls from
 RSS/Atom/JSON feeds, enriches every article with an LLM into structured JSON
 (MITRE Group / Software / Technique / Tactic IDs, CVEs, IOCs, summary,
 key points), and clusters cross-source coverage of the same story using

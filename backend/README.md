@@ -1,8 +1,8 @@
 # pharos (backend)
 
 This is the FastAPI backend for [Pharos](https://github.com/nullvaluefound/pharos),
-a self-hosted, open-source Feedly alternative with LLM enrichment and
-deterministic story clustering.
+a self-hosted, open-source AI-enabled news aggregator with LLM enrichment
+and deterministic story clustering.
 
 See the project root [README](https://github.com/nullvaluefound/pharos#readme)
 for a full feature list, screenshots, and install instructions.

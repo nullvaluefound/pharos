@@ -1,7 +1,8 @@
 # Architecture
 
-Pharos is a self-hosted Feedly alternative organized as **three pipeline
-stages and one serving layer**, all communicating through SQLite.
+Pharos is a self-hosted, open-source AI-enabled news aggregator organized
+as **three pipeline stages and one serving layer**, all communicating
+through SQLite.
 
 ```text
                 +-----------------------------+
@@ -147,8 +148,8 @@ documentation.
 
 ## Why this is enough
 
-The original Feedly architecture (Cassandra + Elasticsearch + ML
-pipeline + vector DB + Kafka) makes sense at hundreds of millions of
+A typical at-scale news-aggregator architecture (Cassandra + Elasticsearch
++ ML pipeline + vector DB + Kafka) makes sense at hundreds of millions of
 users. For an individual or a small team, you can collapse all of that
 into:
 

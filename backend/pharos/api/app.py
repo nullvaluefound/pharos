@@ -33,7 +33,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Pharos",
         version="0.1.0",
-        description="A self-hosted, open-source Feedly alternative.",
+        description="A self-hosted, open-source AI-enabled news aggregator.",
         root_path=s.root_path,
     )
 

@@ -13,7 +13,7 @@ export default {
         mono: ["JetBrains Mono", "ui-monospace", "Menlo", "monospace"],
       },
       colors: {
-        // Pharos light theme inspired by Feedly's clean editorial look
+        // Pharos light theme: clean editorial palette
         ink: {
           50: "#fafafa",
           100: "#f4f4f5",

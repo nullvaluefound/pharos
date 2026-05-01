@@ -16,9 +16,9 @@ beyond `INTEGER PRIMARY KEY AUTOINCREMENT` -> `BIGSERIAL`.
 
 ## Why an LLM instead of an NLP pipeline?
 
-The original Feedly Leo product is built on a multi-year ML pipeline
+A traditional newsroom-grade enrichment stack is a multi-year ML pipeline
 (NER models, topic classifiers, deduplicators, etc.). For a self-hosted
-clone aimed at one user or a small team, that's overkill — and you'd
+deployment aimed at one user or a small team, that's overkill — and you'd
 need to host and maintain models. An LLM with a strict JSON schema:
 
 - Replaces the entire NER + topic + summarization stack with one HTTP
@@ -87,7 +87,7 @@ The `twitter` category in the bundled catalog provides templates with a
 `YOUR_NITTER_OR_RSSHUB` placeholder you must replace. See
 [DEFAULT_FEEDS.md#twitter--x](./DEFAULT_FEEDS.md#twitter--x).
 
-## How do I import my Feedly OPML?
+## How do I import an OPML file from another reader?
 
 Not yet implemented in the UI — for now use the CLI with a tiny script:
 
@@ -121,8 +121,8 @@ retries them.
 
 | Source | How |
 |---|---|
-| Feedly | Export OPML from Feedly Settings -> Organize. Use the script above. |
-| Inoreader | Same: Settings -> Preferences -> Import/Export -> Export OPML. |
+| Most hosted readers | Export OPML from the reader's Settings / Organize / Import-Export menu, then run the import script above. |
+| Inoreader | Settings -> Preferences -> Import/Export -> Export OPML. |
 | Miniflux | `miniflux export-opml` -> import. |
 | TT-RSS | Plugin or `feed_export` CLI -> import. |
 
