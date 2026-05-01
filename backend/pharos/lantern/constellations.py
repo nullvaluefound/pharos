@@ -170,18 +170,27 @@ def _candidate_ids(
     conn: sqlite3.Connection,
     article_id: int,
     tokens: list[str],
+    *,
+    as_of: datetime | None = None,
 ) -> list[tuple[int, int]]:
     """Return (article_id, shared_anchor_count) candidates from the inverted index.
 
     Candidate generation is restricted to the article's ANCHOR tokens -- if
     nothing in our anchor set appears in any other recent article, we have no
     candidates. This makes false-positive clusters structurally impossible.
+
+    ``as_of`` anchors the candidate window. For live enrichment of just-arrived
+    articles this is "now" (the default). For chronological rebuilds it's the
+    article's own ``published_at`` so each article looks back the proper number
+    of days into HISTORY rather than into the recent calendar past.
     """
     anchors = [t for t in tokens if _ns(t) in ANCHOR_NAMESPACES]
     if not anchors:
         return []
     s = get_settings()
-    cutoff = datetime.now(timezone.utc) - timedelta(days=s.cluster_window_days)
+    pivot = as_of if as_of is not None else datetime.now(timezone.utc)
+    lower = pivot - timedelta(days=s.cluster_window_days)
+    upper = pivot + timedelta(days=s.cluster_window_days)
     placeholders = ",".join("?" * len(anchors))
     rows = conn.execute(
         f"""
@@ -192,11 +201,12 @@ def _candidate_ids(
            AND a.id != ?
            AND a.published_at IS NOT NULL
            AND a.published_at > ?
+           AND a.published_at < ?
          GROUP BY at.article_id
          ORDER BY shared DESC
          LIMIT 50
         """,
-        (*anchors, article_id, cutoff),
+        (*anchors, article_id, lower, upper),
     ).fetchall()
     return [(r["article_id"], r["shared"]) for r in rows]
 
@@ -213,13 +223,20 @@ def assign_constellation(
     *,
     article_id: int,
     tokens: list[str],
+    published_at: datetime | None = None,
 ) -> tuple[int, float]:
-    """Persist tokens, find/create the right cluster, return (cluster_id, sim)."""
+    """Persist tokens, find/create the right cluster, return (cluster_id, sim).
+
+    ``published_at`` should be the article's publication timestamp. It pins
+    the candidate-window pivot so historical / out-of-order articles look
+    back into HISTORY around their own publish date rather than around the
+    current wall-clock time. Defaults to None which means "use now()".
+    """
     s = get_settings()
     _replace_tokens(conn, article_id, tokens)
     token_set = _filter_active(set(tokens))
 
-    candidates = _candidate_ids(conn, article_id, tokens)
+    candidates = _candidate_ids(conn, article_id, tokens, as_of=published_at)
 
     best_cluster: int | None = None
     best_sim: float = 0.0

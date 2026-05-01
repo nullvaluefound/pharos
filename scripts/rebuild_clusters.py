@@ -27,8 +27,22 @@ from pathlib import Path
 # Make ``scripts.*`` importable when run as a module from any cwd.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from datetime import datetime  # noqa: E402
+
 from pharos.db.connection import connect  # noqa: E402
 from pharos.lantern.constellations import assign_constellation  # noqa: E402
+
+
+def _parse_ts(value) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    s = str(value).replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        return None
 
 
 def main() -> int:
@@ -61,7 +75,7 @@ def _rebuild(conn) -> int:
     # 3. Pull every article that has at least one token, oldest first.
     rows = conn.execute(
         """
-        SELECT a.id
+        SELECT a.id, a.published_at
           FROM articles a
          WHERE a.published_at IS NOT NULL
            AND EXISTS (
@@ -78,19 +92,31 @@ def _rebuild(conn) -> int:
     joined = 0
     for i, r in enumerate(rows, start=1):
         aid = int(r["id"])
+        published_at = _parse_ts(r["published_at"])
         tok_rows = conn.execute(
             "SELECT token FROM article_tokens WHERE article_id = ?", (aid,)
         ).fetchall()
         tokens = sorted({t["token"] for t in tok_rows})
         if not tokens:
             continue
-        cluster_id, sim = assign_constellation(
-            conn, article_id=aid, tokens=tokens
+        # Pre-check: is this article going to *join* an existing cluster?
+        # We can tell by whether _candidate_ids returns any rows above the
+        # gate. We don't pre-call it though; we just inspect after the fact
+        # whether the article ended up with the most-recent existing
+        # cluster_id (joined) or a brand-new one (new).
+        before_max = conn.execute(
+            "SELECT COALESCE(MAX(id), 0) AS m FROM story_clusters"
+        ).fetchone()["m"]
+        cluster_id, _sim = assign_constellation(
+            conn,
+            article_id=aid,
+            tokens=tokens,
+            published_at=published_at,
         )
-        if sim == 1.0:
-            new_clusters += 1
-        else:
+        if cluster_id <= before_max:
             joined += 1
+        else:
+            new_clusters += 1
         if i % 250 == 0:
             elapsed = time.time() - t0
             rate = i / max(elapsed, 1e-6)

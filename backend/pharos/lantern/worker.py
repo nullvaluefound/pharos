@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import sqlite3
+from datetime import datetime
 from typing import Any
 
 from ..config import get_settings
@@ -177,6 +178,18 @@ async def _process_one(row: sqlite3.Row) -> None:
     title = row["title"]
     url = row["url"]
     body = row["raw_text"] or ""
+    published_raw = row["published_at"] if "published_at" in row.keys() else None
+    published_at: datetime | None = None
+    if published_raw is not None:
+        if isinstance(published_raw, datetime):
+            published_at = published_raw
+        else:
+            try:
+                published_at = datetime.fromisoformat(
+                    str(published_raw).replace("Z", "+00:00")
+                )
+            except ValueError:
+                published_at = None
 
     try:
         enriched = await enrich(title=title, url=url, body=body)
@@ -214,7 +227,12 @@ async def _process_one(row: sqlite3.Row) -> None:
             )
             entity_names = _persist_entities(conn, aid, enriched)
             _refresh_fts(conn, aid, title, enriched.overview, entity_names)
-            assign_constellation(conn, article_id=aid, tokens=fingerprint)
+            assign_constellation(
+                conn,
+                article_id=aid,
+                tokens=fingerprint,
+                published_at=published_at,
+            )
             conn.execute("COMMIT")
         except Exception as exc:
             conn.execute("ROLLBACK")
@@ -240,7 +258,7 @@ def _claim_pending(limit: int) -> list[sqlite3.Row]:
     with connect(attach_cold=False) as conn:
         conn.execute("BEGIN IMMEDIATE")
         rows = conn.execute(
-            "SELECT id, url, title, raw_text FROM articles "
+            "SELECT id, url, title, raw_text, published_at FROM articles "
             "WHERE enrichment_status = 'pending' "
             "ORDER BY fetched_at ASC LIMIT ?",
             (limit,),
