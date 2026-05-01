@@ -158,11 +158,26 @@ class Entities(BaseModel):
         import re
 
         cve_re = re.compile(r"^CVE-\d{4}-\d{4,7}$")
+        # Textbook / placeholder CVE IDs that the LLM occasionally emits as
+        # an example. Any of these in real output is a hallucination.
+        DENYLIST = {
+            "CVE-2024-12345",
+            "CVE-2023-12345",
+            "CVE-2025-12345",
+            "CVE-2026-12345",
+            "CVE-2024-00000",
+            "CVE-2024-99999",
+            "CVE-2024-00001",
+            "CVE-1999-0001",  # the canonical "first CVE" demo ID
+        }
         out: list[str] = []
         for c in v:
             norm = c.strip().upper()
-            if cve_re.match(norm):
-                out.append(norm)
+            if not cve_re.match(norm):
+                continue
+            if norm in DENYLIST:
+                continue
+            out.append(norm)
         return list(dict.fromkeys(out))
 
     @field_validator("mitre_groups")
