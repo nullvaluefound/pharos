@@ -84,6 +84,134 @@ def adduser(
 
 
 @app.command()
+def listusers() -> None:
+    """List all local users."""
+    init_databases()
+    with connect(attach_cold=False) as conn:
+        rows = conn.execute(
+            "SELECT id, username, COALESCE(is_admin,0) AS is_admin, "
+            "       created_at "
+            "FROM users ORDER BY id"
+        ).fetchall()
+    table = Table(title="Pharos Users")
+    for col in ("id", "username", "admin", "created_at"):
+        table.add_column(col)
+    for r in rows:
+        table.add_row(
+            str(r["id"]),
+            r["username"],
+            "yes" if r["is_admin"] else "no",
+            str(r["created_at"] or "-"),
+        )
+    console.print(table)
+
+
+@app.command()
+def deluser(
+    username: str,
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Skip the interactive confirmation prompt.",
+    ),
+) -> None:
+    """Delete a local user and ALL of their personal data.
+
+    Cascade-deletes (via FK ON DELETE CASCADE):
+      - subscriptions     (which feeds the user follows)
+      - user_folders      (custom group definitions)
+      - user_article_state (saved/read/seen flags)
+      - saved_searches    (Watches)
+      - notifications     (in-app delivered watch hits)
+      - reports           (generated threat-intel reports)
+
+    Articles, feeds, story_clusters, and the cold archive are SHARED
+    across users and are NOT touched -- a deleted user's prior reads
+    just lose their per-user state. If you also want the now-orphaned
+    feeds (no remaining subscribers) cleaned up, run a separate
+    maintenance script; this command intentionally stays surgical.
+    """
+    init_databases()
+    with connect(attach_cold=False) as conn:
+        urow = conn.execute(
+            "SELECT id, COALESCE(is_admin,0) AS is_admin "
+            "FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
+        if not urow:
+            console.print(f"[red]No user named {username!r}[/]")
+            raise typer.Exit(1)
+        uid = int(urow["id"])
+
+        # Pre-flight: count what will be deleted so the user can audit.
+        counts: dict[str, int] = {}
+        for table in (
+            "subscriptions",
+            "user_folders",
+            "user_article_state",
+            "saved_searches",
+            "notifications",
+            "reports",
+        ):
+            try:
+                row = conn.execute(
+                    f"SELECT COUNT(*) AS c FROM {table} WHERE user_id = ?",
+                    (uid,),
+                ).fetchone()
+                counts[table] = int(row["c"] or 0)
+            except Exception:
+                # Table might not exist on older schemas; skip.
+                counts[table] = 0
+
+        # Refuse to wipe the last admin -- that's a footgun.
+        if urow["is_admin"]:
+            other_admins = conn.execute(
+                "SELECT COUNT(*) AS c FROM users "
+                "WHERE COALESCE(is_admin,0) = 1 AND id != ?",
+                (uid,),
+            ).fetchone()
+            if int(other_admins["c"] or 0) == 0:
+                console.print(
+                    f"[red]Refusing to delete {username!r}: "
+                    f"that's the only admin account.[/]\n"
+                    f"[dim]Promote another user first "
+                    f"(or pass --yes after creating another admin).[/]"
+                )
+                if not yes:
+                    raise typer.Exit(1)
+
+        # Show the impact summary.
+        table = Table(title=f"Will delete user {username!r} (id={uid}) plus:")
+        table.add_column("table")
+        table.add_column("rows", justify="right")
+        for k, v in counts.items():
+            table.add_row(k, str(v))
+        console.print(table)
+
+        if not yes:
+            confirm = typer.confirm(
+                f"Permanently delete {username!r} and all listed rows?",
+                default=False,
+            )
+            if not confirm:
+                console.print("[yellow]Aborted; nothing changed.[/]")
+                raise typer.Exit(0)
+
+        cur = conn.execute("DELETE FROM users WHERE id = ?", (uid,))
+        conn.commit()
+
+    if cur.rowcount == 0:
+        console.print(f"[red]Delete failed; user {username!r} was not removed.[/]")
+        raise typer.Exit(1)
+
+    console.print(
+        f"[green]Deleted[/] user [bold]{username}[/] (id={uid}) "
+        f"and {sum(counts.values())} cascaded row(s)."
+    )
+
+
+@app.command()
 def watch(
     feed_url: str,
     user: str = typer.Option(..., "--user", "-u", help="Username that should subscribe"),
