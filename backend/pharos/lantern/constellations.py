@@ -148,12 +148,41 @@ def should_consider_cluster(a: set[str], b: set[str]) -> bool:
 
 
 def weighted_jaccard(a: set[str], b: set[str]) -> float:
+    """Weighted Jaccard over ALL active tokens.
+
+    Used by the related-articles UI to render a soft 0..1 similarity
+    between two articles. NOT used for the cluster decision itself --
+    see :func:`anchor_jaccard` for that.
+    """
     a = _filter_active(a)
     b = _filter_active(b)
     if not a or not b:
         return 0.0
     inter_w = sum(_weight(t) for t in a & b)
     union_w = sum(_weight(t) for t in a | b)
+    return inter_w / union_w if union_w else 0.0
+
+
+def anchor_jaccard(a: set[str], b: set[str]) -> float:
+    """Weighted Jaccard restricted to ANCHOR namespaces only.
+
+    Why we don't include the bag-of-words tail in the cluster decision:
+    two outlets covering the same vulnerability often pick wildly
+    different angles ("cryptographic subsystem" vs. "live process code
+    injection" vs. "Python PoC"). Their bag-of-words barely overlaps,
+    so a full-token weighted Jaccard scores ~0.20 even when the CVE
+    matches perfectly. That collapses what should be one cluster into
+    dozens of singletons.
+
+    Anchor-only scoring concentrates the signal where it actually lives
+    (per-event identifiers) and lets the threshold do its job.
+    """
+    a_anc = {t for t in a if _ns(t) in ANCHOR_NAMESPACES}
+    b_anc = {t for t in b if _ns(t) in ANCHOR_NAMESPACES}
+    if not a_anc or not b_anc:
+        return 0.0
+    inter_w = sum(_weight(t) for t in a_anc & b_anc)
+    union_w = sum(_weight(t) for t in a_anc | b_anc)
     return inter_w / union_w if union_w else 0.0
 
 
@@ -214,7 +243,7 @@ def _candidate_ids(
            AND a.published_at < ?
          GROUP BY at.article_id
          ORDER BY shared DESC
-         LIMIT 50
+         LIMIT 200
         """,
         (*anchors, article_id, lower, upper),
     ).fetchall()
@@ -257,7 +286,10 @@ def assign_constellation(
         # OR multiple weak anchors backed by some context overlap.
         if not should_consider_cluster(token_set, cand_tokens):
             continue
-        sim = weighted_jaccard(token_set, cand_tokens)
+        # Anchor-only similarity for the threshold decision -- bag-of-words
+        # dilutes the union too aggressively when two outlets cover the
+        # same event with different angles. See anchor_jaccard() docstring.
+        sim = anchor_jaccard(token_set, cand_tokens)
         if sim < s.cluster_sim_threshold:
             continue
         cand_cluster_row = conn.execute(

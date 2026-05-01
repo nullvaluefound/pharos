@@ -96,19 +96,22 @@ CONFIG: CLUSTER_WINDOW_DAYS, CLUSTER_MIN_SHARED, CLUSTER_SIM_THRESHOLD
 
 1. Insert A's tokens into article_tokens (inverted index).
 
-2. Find candidate articles using ONLY A's anchor tokens (per-event IDs):
+2. Find candidate articles using ONLY A's anchor tokens (per-event IDs)
+   inside the window centered on A.published_at (NOT wall clock now;
+   that breaks rebuilds of historical data):
        SELECT article_id, COUNT(*) AS shared
          FROM article_tokens
         WHERE token IN anchors(F)
           AND article != A
-          AND published_at > now() - CLUSTER_WINDOW_DAYS
+          AND published_at BETWEEN A.published_at - WINDOW
+                               AND A.published_at + WINDOW
         GROUP BY article_id
-        ORDER BY shared DESC LIMIT 50
+        ORDER BY shared DESC LIMIT 200
    If A has no anchor tokens, A starts its own cluster -- no candidates.
 
 3. For each candidate C:
        if not should_consider_cluster(F, tokens(C)): skip   # tiered gate
-       sim = weighted_jaccard(F, tokens(C))
+       sim = anchor_jaccard(F, tokens(C))                   # anchor-only!
        if sim < CLUSTER_SIM_THRESHOLD: skip
        cluster = articles(C).story_cluster_id
        if cluster is None: skip
@@ -120,23 +123,44 @@ CONFIG: CLUSTER_WINDOW_DAYS, CLUSTER_MIN_SHARED, CLUSTER_SIM_THRESHOLD
        create a new story_cluster with A as the representative.
 ```
 
-Weighted Jaccard:
+### Why the threshold scores anchors only
+
+Originally the threshold used **weighted Jaccard over all tokens** (anchors
++ bag-of-words). That broke for the most important case: two outlets
+covering the *same* CVE / actor / malware with completely different
+angles. Their anchors agree, but their bag-of-words diverges, e.g.:
+
+- A: `cve:cve-2026-31431` + 30 words about "cryptographic subsystem"
+- B: `cve:cve-2026-31431` + 30 words about "live process injection"
+
+Full-token weighted Jaccard for that pair: ~0.20. Threshold (0.30)
+rejects. Cluster decision: SINGLETON. Wrong answer -- the CVE itself
+*is* the event identity.
+
+So the threshold scores **anchor tokens only** (`anchor_jaccard`):
 
 ```
-              sum( weight(t) for t in A & B )
-J(A, B) = ---------------------------------------
-              sum( weight(t) for t in A | B )
+                sum( weight(t) for t in (A & B) ∩ anchors )
+A_J(A, B) = ---------------------------------------------------
+                sum( weight(t) for t in (A | B) ∩ anchors )
 ```
 
-The default thresholds (`CLUSTER_MIN_SHARED=4`, `CLUSTER_SIM_THRESHOLD=0.55`)
-were chosen so that:
+For the same example: intersection = `cve` (15), union = `cve` (15)
+→ A_J = 1.0. Cluster decision: JOIN. Correct.
 
-- Two articles sharing one CVE + one MITRE Group + a couple of words
-  always cluster.
-- Two articles that share only common bag-of-words tokens (`w:report`,
-  `w:campaign`, ...) do not cluster.
-- The candidate-lookup query stays cheap (the inverted index is
-  selective enough).
+The bag-of-words tail still matters for **gating** (the weak-anchor
+context floor in `should_consider_cluster` uses it to defeat template
+false positives like 9to5Mac roundups), and for **UI similarity
+scores** between two articles (`weighted_jaccard`). But it stays out
+of the cluster decision itself.
+
+### Threshold
+
+`CLUSTER_SIM_THRESHOLD=0.30` (anchor-jaccard scale). With anchor-only
+scoring, even a single shared strong anchor scores 1.0 when neither
+article has competing anchors -- so the threshold mostly gates pairs
+that share lower-weight anchors against pairs that share much heavier
+ones.
 
 If you find your stream over-clustering or under-clustering, the three
 config knobs are the tuning surface. Bumping `CLUSTER_MIN_SHARED` to 6

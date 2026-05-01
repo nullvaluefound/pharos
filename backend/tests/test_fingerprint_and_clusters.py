@@ -1,4 +1,5 @@
 from pharos.lantern.constellations import (
+    anchor_jaccard,
     has_anchor_overlap,
     shared_tokens,
     should_consider_cluster,
@@ -44,7 +45,7 @@ def make_article(
 def test_fingerprint_is_deterministic_and_namespaced():
     a = make_article(
         actors=[ThreatActorEntity(name="APT29", mitre_group_id="G0016")],
-        cves=["CVE-2024-12345"],
+        cves=["CVE-2024-23456"],
         companies=["Microsoft"],
         ttps=["T1566.001"],
     )
@@ -53,7 +54,7 @@ def test_fingerprint_is_deterministic_and_namespaced():
     assert fp1 == fp2
     assert "thr:apt29" in fp1
     assert "mtg:g0016" in fp1
-    assert "cve:cve-2024-12345" in fp1
+    assert "cve:cve-2024-23456" in fp1
     assert "com:microsoft" in fp1
     # MITRE techniques and tactics are intentionally NOT in the fingerprint
     # (see fingerprint.py docstring above NS_SECTOR).
@@ -64,12 +65,12 @@ def test_fingerprint_is_deterministic_and_namespaced():
 def test_weighted_jaccard_prefers_high_signal_overlap():
     base = make_article(
         actors=[ThreatActorEntity(name="APT29", mitre_group_id="G0016")],
-        cves=["CVE-2024-12345"],
+        cves=["CVE-2024-23456"],
         companies=["Microsoft"],
     )
     near = make_article(
         actors=[ThreatActorEntity(name="APT29", mitre_group_id="G0016")],
-        cves=["CVE-2024-12345"],
+        cves=["CVE-2024-23456"],
         companies=["Microsoft"],
     )
     far = make_article(
@@ -90,11 +91,11 @@ def test_anchor_overlap_required_for_clustering():
     no matter how many topic/word tokens they share."""
     a = make_article(
         actors=[ThreatActorEntity(name="APT29", mitre_group_id="G0016")],
-        cves=["CVE-2024-12345"],
+        cves=["CVE-2024-23456"],
     )
     b = make_article(
         actors=[ThreatActorEntity(name="Lazarus", mitre_group_id="G0032")],
-        cves=["CVE-2024-99999"],
+        cves=["CVE-2024-77777"],
     )
     fa = set(build_fingerprint(a, title="reconnaissance attacker phishing campaign"))
     fb = set(build_fingerprint(b, title="reconnaissance attacker phishing campaign"))
@@ -102,8 +103,8 @@ def test_anchor_overlap_required_for_clustering():
 
 
 def test_anchor_overlap_succeeds_on_shared_cve():
-    a = make_article(cves=["CVE-2024-12345"], companies=["Microsoft"])
-    b = make_article(cves=["CVE-2024-12345"], companies=["Acme"])
+    a = make_article(cves=["CVE-2024-23456"], companies=["Microsoft"])
+    b = make_article(cves=["CVE-2024-23456"], companies=["Acme"])
     fa = set(build_fingerprint(a, title="x"))
     fb = set(build_fingerprint(b, title="y"))
     assert has_anchor_overlap(fa, fb)
@@ -111,10 +112,49 @@ def test_anchor_overlap_succeeds_on_shared_cve():
 
 def test_should_consider_cluster_one_strong_anchor_passes():
     """A single shared CVE is enough to consider clustering."""
-    a = make_article(cves=["CVE-2024-12345"])
-    b = make_article(cves=["CVE-2024-12345"])
+    a = make_article(cves=["CVE-2024-23456"])
+    b = make_article(cves=["CVE-2024-23456"])
     fa = set(build_fingerprint(a, title="alpha bravo charlie"))
     fb = set(build_fingerprint(b, title="delta echo foxtrot"))
+    assert should_consider_cluster(fa, fb)
+
+
+def test_anchor_jaccard_clusters_same_cve_with_disjoint_word_bags():
+    """The original Sploitus bug. Two outlets covering the same CVE with
+    completely different angles ("crypto subsystem" vs. "live process
+    code injection") share only one anchor token but tons of disjoint
+    bag-of-words.
+
+    Full-token weighted Jaccard collapses to ~0.20 here and the cluster
+    decision rejects them. anchor_jaccard sees through the noise:
+    intersection = 1 anchor (CVE), union = 1 anchor -> sim = 1.0.
+    """
+    a = make_article(
+        cves=["CVE-2024-23456"],
+        key_points=[
+            "Critical local privilege escalation in cryptographic subsystem",
+            "Affects Linux kernels compiled after 2017",
+            "Memory-resident Python script triggers the flaw",
+        ],
+    )
+    b = make_article(
+        cves=["CVE-2024-23456"],
+        key_points=[
+            "Live process code injection enables attacker pivot",
+            "Proof of concept published on Sploitus",
+            "Educational and security research purposes only",
+        ],
+    )
+    fa = set(build_fingerprint(a, title="Exploit for CVE-2024-23456 exploit"))
+    fb = set(build_fingerprint(b, title="Exploit for CVE-2024-23456 exploit"))
+
+    full_sim = weighted_jaccard(fa, fb)
+    anchor_sim = anchor_jaccard(fa, fb)
+
+    # Full-token Jaccard gets diluted by disjoint bag-of-words.
+    assert full_sim < 0.5
+    # Anchor-only Jaccard correctly recognizes the shared CVE event.
+    assert anchor_sim >= 0.5
     assert should_consider_cluster(fa, fb)
 
 
@@ -164,8 +204,8 @@ def test_should_consider_cluster_two_weak_anchors_blocked_when_context_disjoint(
 def test_legacy_ttp_tokens_are_ignored_in_similarity():
     """Stale ``ttp:`` rows in article_tokens (from before the refactor) must
     not contribute to similarity or shared-token output."""
-    a = {"cve:cve-2024-12345", "thr:apt29", "ttp:t1566.001", "ttp:t1589"}
-    b = {"cve:cve-2024-12345", "thr:apt29", "ttp:t1566.001", "ttp:t1589"}
+    a = {"cve:cve-2024-23456", "thr:apt29", "ttp:t1566.001", "ttp:t1589"}
+    b = {"cve:cve-2024-23456", "thr:apt29", "ttp:t1566.001", "ttp:t1589"}
     sim = weighted_jaccard(a, b)
     assert sim == 1.0
     assert all(not t.startswith("ttp:") for t in shared_tokens(a, b))
@@ -194,6 +234,14 @@ def test_invalid_technique_id_rejected():
 
 
 def test_cve_normalization():
-    e = Entities(cves=["cve-2024-12345", "garbage", "CVE-2023-1"])
+    e = Entities(cves=["cve-2024-23456", "garbage", "CVE-2023-1"])
     # garbage and CVE-2023-1 (only 1 digit) dropped; valid one normalized
-    assert e.cves == ["CVE-2024-12345"]
+    assert e.cves == ["CVE-2024-23456"]
+
+
+def test_cve_denylist_drops_placeholders():
+    # Textbook / hallucinated demo CVEs the LLM occasionally emits should
+    # be filtered out -- they cause unrelated articles to false-positive
+    # cluster on a "shared" CVE that doesn't actually exist.
+    e = Entities(cves=["CVE-2024-12345", "CVE-1999-0001", "CVE-2024-23456"])
+    assert e.cves == ["CVE-2024-23456"]
