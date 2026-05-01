@@ -1,0 +1,204 @@
+PHAROS PROPRIETARY LICENSE
+Version 1.0, May 2026
+
+Copyright (c) 2026 nullvaluefound. All rights reserved.
+
+Pharos (including the source code, compiled binaries, container images,
+configuration, branding assets, documentation, and all other materials
+contained in this repository -- collectively, the "Software") is the
+proprietary property of the copyright holder. This is NOT an open-source
+license under the Open Source Initiative definition.
+
+
+1. PERSONAL USE GRANT
+---------------------
+Subject to the restrictions in Sections 2-5, the copyright holder grants
+you a worldwide, royalty-free, non-exclusive, non-transferable,
+revocable license to:
+
+  (a) Download a copy of the Software from the official repository.
+  (b) View, study, and modify the source code for personal, educational,
+      and evaluation purposes.
+  (c) Compile, build, run, and self-host the Software on hardware that
+      you (a single individual) personally own or rent for your own
+      personal use.
+  (d) Make personal backup copies of the Software.
+
+"Personal use" means use by a single natural person for their own
+benefit, in their own household, with no payment, fee, subscription,
+advertising revenue, equity, in-kind compensation, or other monetary or
+commercial benefit flowing to any party (including you) directly or
+indirectly from access to or operation of the Software.
+
+
+1A. OWNER'S EMPLOYER EXCEPTION
+------------------------------
+As an exception to Sections 2 and 3, the copyright holder (the
+"Owner") and the legal entity that employs, retains, or contracts with
+the Owner at any given time (the "Owner's Employer") -- including the
+directors, officers, employees, contractors, and members of the Owner's
+Employer acting in the scope of their roles for the Owner's Employer --
+are granted a royalty-free, worldwide, non-exclusive license to use,
+deploy, self-host, and internally distribute the Software for the
+internal business purposes of the Owner's Employer, including
+commercial and operational use, without obtaining a separate commercial
+license under Section 3.
+
+This exception is subject to the following clarifications and limits:
+
+  (a) The exception attaches to the Owner's then-current employer at
+      the time of use. If the Owner changes employers, the exception
+      automatically covers the new employer and ceases to cover the
+      former employer for any new use that begins after the
+      employment relationship ends. Software already deployed under
+      this exception by a former employer must, going forward, either
+      (i) be removed, or (ii) be brought under a commercial license
+      pursuant to Section 3.
+  (b) The exception is internal-use only. It does NOT permit the
+      Owner's Employer to redistribute, sell, sublicense, host as a
+      service to third parties, package into a commercial product, or
+      otherwise convey the Software to anyone outside the Owner's
+      Employer.
+  (c) The exception does NOT permit the Owner's Employer to remove,
+      alter, or replace the Pharos branding, logos, copyright
+      notices, or this license text.
+  (d) The Owner's Employer is not granted any rights in the Pharos
+      name, logo, or trademarks for marketing, product naming, or
+      external-facing materials.
+  (e) The Owner may, at the Owner's sole discretion and at any time,
+      extend, narrow, or revoke this exception by publishing notice in
+      the official repository. Any such change takes effect on
+      publication.
+  (f) This exception does not create any employment, partnership, or
+      agency relationship between the Owner's Employer and the Owner
+      with respect to the Software, and does not obligate the Owner to
+      provide any support, warranty, maintenance, or further
+      development.
+
+For the avoidance of doubt: this exception is purely a courtesy
+carve-out granted by the Owner to the Owner's Employer. It does NOT
+extend to any other organization (including parent companies,
+subsidiaries, affiliates, joint ventures, or business partners of the
+Owner's Employer) unless the Owner expressly says so in writing in the
+official repository.
+
+
+2. RESTRICTIONS -- WHAT YOU MAY NOT DO WITHOUT A COMMERCIAL LICENSE
+-------------------------------------------------------------------
+Without a separate commercial license signed by the copyright holder,
+you may NOT:
+
+  (a) Use the Software in a business, commercial, governmental, military,
+      or non-profit organization context, including internal use by
+      employees, contractors, members, or volunteers of such an
+      organization.
+  (b) Use the Software to provide a product, service, hosted offering,
+      managed service, consulting service, training, or any other
+      offering to any third party, whether for a fee or free of charge.
+  (c) Use the Software, in whole or in part, to generate revenue,
+      reduce costs, or create commercial value, directly or indirectly.
+  (d) Distribute, redistribute, sublicense, sell, lease, rent, or
+      otherwise convey the Software (modified or unmodified) to any
+      third party.
+  (e) Remove, alter, obscure, or replace any copyright notice, license
+      notice, branding, logo, or attribution in or on the Software.
+  (f) Use the Pharos name, lighthouse logo, "A beam through the noise"
+      tagline, or any associated trademarks for any purpose other than
+      truthful, factual reference to this Software (no endorsement,
+      derivative branding, or fork-renaming).
+  (g) Train, fine-tune, or otherwise feed the Software (including its
+      source code or any output it produces) into any machine-learning
+      model intended for commercial use, redistribution, or any
+      third-party access.
+  (h) Use the Software in any safety-critical, life-critical, or
+      regulated environment (including medical, automotive, aviation,
+      nuclear, financial-trading, or government decisioning systems).
+
+
+3. COMMERCIAL LICENSING
+-----------------------
+A commercial license is required for any use that falls outside the
+"Personal Use Grant" in Section 1. Commercial licenses are available
+exclusively from the copyright holder and are issued on a case-by-case
+basis. There is no automatic, click-through, or self-serve commercial
+licensing.
+
+To request a commercial license (including pricing, evaluation
+licenses, OEM licenses, hosted-deployment licenses, or government
+licenses), open a private inquiry through the official repository:
+
+  https://github.com/nullvaluefound/pharos    (open a Discussion or
+                                                contact the repo owner)
+
+Until a written commercial license is signed by the copyright holder,
+no commercial right of any kind is granted, regardless of any
+representations made elsewhere.
+
+
+4. CONTRIBUTIONS
+----------------
+By submitting any pull request, patch, suggestion, bug report, or other
+contribution to this repository ("Contribution"), you irrevocably grant
+the copyright holder a perpetual, worldwide, royalty-free, exclusive,
+sublicensable license to use, modify, distribute, sublicense, and
+relicense the Contribution under any terms (including under future
+versions of this license, under a commercial license, or under any
+other license the copyright holder chooses), with no obligation to
+attribute, compensate, or notify you. You represent that the
+Contribution is yours to grant under these terms.
+
+
+5. TERMINATION
+--------------
+Any breach of Section 2 immediately and automatically terminates all
+rights granted to you under Section 1, without notice. Upon
+termination, you must cease all use of the Software and destroy all
+copies in your possession or control. The copyright holder may also
+terminate the personal-use grant at any time, for any reason, by
+publishing notice in the official repository.
+
+
+6. DISCLAIMER OF WARRANTY
+-------------------------
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT,
+ACCURACY, OR THAT THE SOFTWARE WILL BE ERROR-FREE OR UNINTERRUPTED.
+THE COPYRIGHT HOLDER MAKES NO REPRESENTATION REGARDING THE SECURITY,
+RELIABILITY, OR SUITABILITY OF THE SOFTWARE FOR ANY PURPOSE.
+
+Pharos enriches third-party content using third-party large language
+models (e.g. OpenAI). The copyright holder makes no representation
+regarding the accuracy, completeness, or fitness of any output produced
+by such models. You are solely responsible for verifying any
+intelligence, indicators, attributions, or analysis before acting on
+them.
+
+
+7. LIMITATION OF LIABILITY
+--------------------------
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL
+THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY (WHETHER IN CONTRACT, TORT, OR OTHERWISE) ARISING FROM, OUT
+OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE, INCLUDING BUT NOT LIMITED TO ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+
+8. GOVERNING LAW
+----------------
+This license shall be governed by and construed under the laws of the
+United States and the State of New York, without regard to its
+conflict-of-laws principles. Any dispute arising under this license
+shall be resolved exclusively in the state or federal courts located
+in New York County, New York.
+
+
+9. ENTIRE AGREEMENT
+-------------------
+This document is the entire agreement between you and the copyright
+holder concerning the Software and supersedes any prior agreement,
+notice, or understanding, whether oral or written.
+
+End of Pharos Proprietary License v1.0

@@ -1,0 +1,11 @@
+[Unit]
+Description=Pharos archiver (Stage 3) -- one-shot, run by pharos-archiver.timer
+After=network.target
+
+[Service]
+Type=oneshot
+User=pharos
+Group=pharos
+WorkingDirectory=/opt/pharos
+EnvironmentFile=/etc/pharos/pharos.env
+ExecStart=/opt/pharos/venv/bin/pharos archive

@@ -1,0 +1,16 @@
+[Unit]
+Description=Pharos lantern -- LLM enrichment worker (Stage 2)
+After=network.target pharos-api.service
+
+[Service]
+Type=simple
+User=pharos
+Group=pharos
+WorkingDirectory=/opt/pharos
+EnvironmentFile=/etc/pharos/pharos.env
+ExecStart=/opt/pharos/venv/bin/pharos light
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Pharos data
+data/
+*.db
+*.db-wal
+*.db-shm
+blobs/
+
+# Node / Vite
+node_modules/
+dist/
+.next/
+out/
+.turbo/
+*.log
+*.tsbuildinfo
+
+# Old Next.js frontend (replaced by Vite SPA)
+frontend.legacy/
+
+# Editors / OS
+.idea/
+.vscode/
+.cursor/
+.DS_Store
+Thumbs.db
+
+# Cursor agent artifacts
+agent-tools/
+agent-transcripts/
+assets/
+mcps/
+terminals/
+
+# Scratch / debug scripts (per-deploy investigation tools, not for repo)
+scripts/_*

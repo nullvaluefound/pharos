@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    font-feature-settings: "cv11", "ss01", "ss03";
+  }
+  ::selection { background-color: rgb(37 99 235 / 0.2); }
+
+  /* Dark-mode body baseline. Brand palette: pharos.navy.800 (#0b1224)
+     for the canvas, ink-100 equivalent for primary text. */
+  .dark body {
+    background-color: #0b1224;
+    color: #e4e4e7;
+  }
+  .dark ::selection { background-color: rgb(232 169 60 / 0.35); }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg
+           px-3 py-1.5 text-sm font-medium transition-colors
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-beam-500/40
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-beam-600 text-white hover:bg-beam-700 active:bg-beam-800
+           dark:bg-pharos-gold-500 dark:text-pharos-navy-900
+           dark:hover:bg-pharos-gold-400 dark:active:bg-pharos-gold-600;
+  }
+  .btn-secondary {
+    @apply btn bg-ink-100 text-ink-900 hover:bg-ink-200 active:bg-ink-300
+           dark:bg-pharos-navy-600 dark:text-ink-100
+           dark:hover:bg-pharos-navy-500 dark:active:bg-pharos-navy-700;
+  }
+  .btn-ghost {
+    @apply btn text-ink-600 hover:bg-ink-100 hover:text-ink-900
+           dark:text-ink-300 dark:hover:bg-pharos-navy-600 dark:hover:text-ink-100;
+  }
+  .btn-danger {
+    @apply btn bg-danger-50 text-danger-600 hover:bg-danger-100
+           dark:bg-danger-900/40 dark:text-danger-400 dark:hover:bg-danger-900/60;
+  }
+  .input {
+    @apply w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm
+           placeholder:text-ink-400
+           focus:border-beam-500 focus:ring-2 focus:ring-beam-500/20 focus:outline-none
+           transition
+           dark:border-pharos-navy-500 dark:bg-pharos-navy-700 dark:text-ink-100
+           dark:placeholder:text-ink-500
+           dark:focus:border-pharos-gold-500 dark:focus:ring-pharos-gold-500/20;
+  }
+  .card {
+    @apply rounded-xl border border-ink-200 bg-white shadow-soft
+           dark:border-pharos-navy-500 dark:bg-pharos-navy-700 dark:shadow-none;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-md
+           bg-ink-100 text-ink-700 px-2 py-0.5 text-[11px] font-medium
+           dark:bg-pharos-navy-600 dark:text-ink-200;
+  }
+  .chip-blue {
+    @apply chip bg-beam-50 text-beam-700
+           dark:bg-pharos-gold-500/15 dark:text-pharos-gold-300;
+  }
+  .chip-amber {
+    @apply chip bg-warm-50 text-warm-600
+           dark:bg-warm-500/15 dark:text-warm-400;
+  }
+  .chip-red {
+    @apply chip bg-danger-50 text-danger-600
+           dark:bg-danger-900/40 dark:text-danger-400;
+  }
+  .chip-green {
+    @apply chip bg-good-50 text-good-600
+           dark:bg-good-500/15 dark:text-good-400;
+  }
+}
+
+/* Subtle scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgb(0 0 0 / 0.12);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgb(0 0 0 / 0.22); }
+.dark ::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.10); }
+.dark ::-webkit-scrollbar-thumb:hover { background: rgb(244 184 74 / 0.35); }
+
+/* ---------------------------------------------------------------------------
+ * Dark-mode overrides for raw Tailwind classes scattered across components.
+ *
+ * Rather than litter every component file with `dark:` variants, we map the
+ * common utility classes the existing UI relies on to brand-dark equivalents
+ * here. This keeps the diff small and dark mode consistent everywhere.
+ * --------------------------------------------------------------------------*/
+.dark .bg-white { background-color: #0f1828 !important; }       /* pharos-navy-700 */
+.dark .bg-ink-50 { background-color: #0b1224 !important; }       /* body/canvas */
+.dark .bg-ink-100 { background-color: #131c30 !important; }      /* hover surface */
+.dark .bg-ink-100\/50 { background-color: rgb(19 28 48 / 0.5) !important; }
+.dark .bg-ink-200 { background-color: #1a2742 !important; }
+.dark .bg-ink-300 { background-color: #2f3f60 !important; }
+
+.dark .border-ink-100 { border-color: #131c30 !important; }
+.dark .border-ink-200 { border-color: #1a2742 !important; }
+.dark .border-ink-300 { border-color: #2f3f60 !important; }
+
+.dark .text-ink-300 { color: #a1a1aa !important; }
+.dark .text-ink-400 { color: #a1a1aa !important; }
+.dark .text-ink-500 { color: #c2c8d5 !important; }
+.dark .text-ink-600 { color: #d4d4d8 !important; }
+.dark .text-ink-700 { color: #e4e4e7 !important; }
+.dark .text-ink-800 { color: #f4f4f5 !important; }
+.dark .text-ink-900 { color: #fafafa !important; }
+
+/* Hover accents pick up brand gold instead of bright blue */
+.dark .hover\:bg-ink-50:hover { background-color: #131c30 !important; }
+.dark .hover\:bg-ink-100:hover { background-color: #1a2742 !important; }
+
+/* Beam (blue) accents stay legible -- shift to softer gold-tinted variants
+   for the most common surface/foreground tints, but keep beam buttons since
+   the .btn-primary rule above already retunes those. */
+.dark .bg-beam-50 { background-color: rgb(232 169 60 / 0.10) !important; }
+.dark .bg-beam-100 { background-color: rgb(232 169 60 / 0.18) !important; }
+.dark .bg-beam-50\/50 { background-color: rgb(232 169 60 / 0.06) !important; }
+.dark .text-beam-600,
+.dark .text-beam-700 { color: #f4b84a !important; }
+.dark .hover\:text-beam-700:hover,
+.dark .hover\:text-beam-900:hover { color: #fbd97a !important; }
+.dark .border-beam-500 { border-color: #e8a93c !important; }
+.dark .ring-beam-500 { --tw-ring-color: #e8a93c !important; }
+
+/* Page header / large headings: keep crisp white in dark */
+.dark .text-ink-900 { color: #ffffff !important; }

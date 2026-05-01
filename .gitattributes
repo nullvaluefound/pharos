@@ -1,0 +1,17 @@
+# Force LF endings on files that must be Unix-line-ending regardless of the
+# host OS git was cloned on. Without this, scripts authored on Windows pick
+# up CRLF and break inside Linux containers / Alpine /bin/sh.
+
+*.sh           text eol=lf
+*.bash         text eol=lf
+*.py           text eol=lf
+*.sql          text eol=lf
+*.yml          text eol=lf
+*.yaml         text eol=lf
+Dockerfile*    text eol=lf
+*.conf         text eol=lf
+
+# Windows scripts stay CRLF
+*.ps1          text eol=crlf
+*.bat          text eol=crlf
+*.cmd          text eol=crlf

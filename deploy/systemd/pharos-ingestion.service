@@ -1,0 +1,16 @@
+[Unit]
+Description=Pharos ingestion scheduler (Stage 1)
+After=network.target pharos-api.service
+
+[Service]
+Type=simple
+User=pharos
+Group=pharos
+WorkingDirectory=/opt/pharos
+EnvironmentFile=/etc/pharos/pharos.env
+ExecStart=/opt/pharos/venv/bin/pharos sweep
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,110 @@
+# Pharos -- multi-container compose.
+# Each pipeline stage runs in its own container; all share /data.
+#
+# First-time setup:
+#   ./setup-env.sh          (or .\setup-env.ps1)   # writes .env
+#   docker compose -f deploy/compose/docker-compose.split.yml up -d
+services:
+  preflight:
+    image: alpine:3.20
+    env_file: ../../.env
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        fail=0
+        if [ -z "$$OPENAI_API_KEY" ] || [ "$$OPENAI_API_KEY" = "sk-replace-me" ]; then
+          echo "ERROR: OPENAI_API_KEY is missing or still the placeholder." >&2
+          fail=1
+        else
+          echo "OK: OPENAI_API_KEY is set."
+        fi
+        if [ -z "$$JWT_SECRET" ] \
+           || [ "$$JWT_SECRET" = "please-change-me-to-a-long-random-string" ] \
+           || [ "$$JWT_SECRET" = "dev-secret-change-me" ]; then
+          echo "ERROR: JWT_SECRET is missing or still the placeholder." >&2
+          fail=1
+        else
+          echo "OK: JWT_SECRET is set."
+        fi
+        if [ "$$fail" -ne 0 ]; then
+          echo "Pre-flight failed. Stack will not start." >&2
+          exit 1
+        fi
+        echo "Pre-flight passed."
+    restart: "no"
+
+  api:
+    build: { context: ../.., dockerfile: deploy/docker/Dockerfile.backend }
+    image: pharos/api:latest
+    env_file: ../../.env
+    environment: { PHAROS_DB_DIR: /data }
+    volumes: ["pharos_data:/data"]
+    ports: ["8000:8000"]
+    depends_on:
+      preflight: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  ingestion:
+    image: pharos/api:latest
+    env_file: ../../.env
+    environment: { PHAROS_DB_DIR: /data }
+    volumes: ["pharos_data:/data"]
+    command: ["pharos", "sweep"]
+    depends_on:
+      preflight: { condition: service_completed_successfully }
+      api: { condition: service_started }
+    restart: unless-stopped
+
+  lantern:
+    image: pharos/api:latest
+    env_file: ../../.env
+    environment: { PHAROS_DB_DIR: /data }
+    volumes: ["pharos_data:/data"]
+    command: ["pharos", "light"]
+    depends_on:
+      preflight: { condition: service_completed_successfully }
+      api: { condition: service_started }
+    restart: unless-stopped
+
+  notifier:
+    image: pharos/api:latest
+    env_file: ../../.env
+    environment: { PHAROS_DB_DIR: /data }
+    volumes: ["pharos_data:/data"]
+    command: ["pharos", "notify"]
+    depends_on:
+      preflight: { condition: service_completed_successfully }
+      api: { condition: service_started }
+    restart: unless-stopped
+
+  archiver:
+    image: pharos/api:latest
+    env_file: ../../.env
+    environment: { PHAROS_DB_DIR: /data }
+    volumes: ["pharos_data:/data"]
+    # Cron-style: run every 6h.
+    command: ["sh", "-c", "while true; do pharos archive; sleep 21600; done"]
+    depends_on:
+      preflight: { condition: service_completed_successfully }
+      api: { condition: service_started }
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.frontend
+      args:
+        # Vite/nginx setup; the same value is also re-templated at runtime.
+        PHAROS_API_URL: http://api:8000
+    image: pharos/frontend:latest
+    environment:
+      PHAROS_API_URL: http://api:8000
+    depends_on:
+      api: { condition: service_started }
+    ports: ["3000:3000"]
+    restart: unless-stopped
+
+volumes:
+  pharos_data:

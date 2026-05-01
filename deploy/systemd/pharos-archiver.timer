@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Pharos archiver daily
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+Unit=pharos-archiver.service
+
+[Install]
+WantedBy=timers.target

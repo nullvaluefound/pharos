@@ -1,0 +1,27 @@
+# Pharos all-in-one image: API + scheduler + lantern + archiver in one container.
+# For small deployments. Frontend runs as a separate container in compose.
+FROM python:3.12-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        supervisor curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY backend/pyproject.toml /app/pyproject.toml
+COPY backend/pharos /app/pharos
+
+RUN pip install --upgrade pip && pip install /app
+
+COPY deploy/docker/supervisord.conf /etc/supervisor/conf.d/pharos.conf
+COPY scripts/bootstrap_admin.py /code/scripts/bootstrap_admin.py
+
+ENV PHAROS_DB_DIR=/data
+RUN mkdir -p /data
+VOLUME ["/data"]
+
+EXPOSE 8000
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/pharos.conf"]

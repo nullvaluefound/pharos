@@ -1,0 +1,49 @@
+# Speed up `docker build` by keeping the context small.
+
+# VCS
+.git
+.gitattributes
+.gitignore
+
+# Editors / OS
+.idea/
+.vscode/
+.cursor/
+.DS_Store
+Thumbs.db
+
+# Local dev artifacts
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend.legacy/
+**/*.log
+
+# Local data / secrets. `data/` here is the project-root runtime SQLite
+# directory. Nested package data dirs (backend/pharos/lantern/data, which
+# ships the MITRE + Malpedia catalogs) MUST NOT be excluded, so we anchor
+# to the project root with a leading slash.
+.env
+/data/
+*.db
+*.db-wal
+*.db-shm
+blobs/
+
+# Cursor / agent artifacts that aren't needed in the image
+agent-tools/
+agent-transcripts/
+assets/
+mcps/
+terminals/

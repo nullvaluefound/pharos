@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Sample Threat Feed</title>
+    <link>https://example.com</link>
+    <description>Sample feed for Pharos tests.</description>
+    <item>
+      <title>APT29 abuses CVE-2024-12345 in Exchange</title>
+      <link>https://example.com/articles/apt29-exchange</link>
+      <pubDate>Mon, 28 Apr 2026 14:02:00 GMT</pubDate>
+      <description>APT29 was observed exploiting CVE-2024-12345 in Microsoft Exchange Server 2019 to target European diplomats.</description>
+    </item>
+    <item>
+      <title>Lazarus deploys new malware against fintech firms</title>
+      <link>https://example.com/articles/lazarus-fintech</link>
+      <pubDate>Mon, 28 Apr 2026 12:30:00 GMT</pubDate>
+      <description>The Lazarus Group was attributed to attacks against South Korean fintech companies using a new strain of malware.</description>
+    </item>
+  </channel>
+</rss>

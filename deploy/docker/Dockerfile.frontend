@@ -1,0 +1,44 @@
+# ---- Build stage ------------------------------------------------------------
+# Use Debian (glibc) rather than alpine (musl): rollup ships platform-specific
+# native binaries via optional deps and the alpine variant
+# (@rollup/rollup-linux-x64-musl) is not always pulled in correctly because of
+# https://github.com/npm/cli/issues/4828.
+FROM node:20-bookworm-slim AS builder
+WORKDIR /app
+
+# Install dependencies. Do NOT pass --omit=optional: rollup's native binary
+# is shipped as an optional dep, so omitting them breaks `vite build`.
+# We also drop the lockfile in the image so npm re-resolves platform-specific
+# optionals for the build host (avoids a Windows-generated lock locking the
+# wrong rollup platform).
+COPY frontend/package.json ./
+RUN npm install --no-audit --no-fund
+
+# Copy the rest of the frontend and build
+COPY frontend/ ./
+ARG PHAROS_API_URL=http://pharos:8000
+ENV PHAROS_API_URL=$PHAROS_API_URL
+RUN npm run build
+
+# ---- Runtime stage: tiny nginx that serves /dist + proxies /api -------------
+FROM nginx:1.27-alpine
+
+# nginx config that:
+#   - serves the built SPA (with HTML5 fallback to /index.html)
+#   - reverse-proxies /api/ to the pharos backend
+COPY deploy/docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+ENV PHAROS_API_URL=http://pharos:8000
+
+# Re-template the nginx config at container start, so PHAROS_API_URL can be
+# overridden at runtime without a rebuild.
+COPY deploy/docker/frontend-entrypoint.sh /docker-entrypoint.d/40-pharos-api.sh
+# Strip Windows CRLF line endings (they make `#!/bin/sh` unrunnable: the
+# shebang gets parsed as "/bin/sh\r"). Belt-and-suspenders: it's free even if
+# the source already uses LF.
+RUN sed -i 's/\r$//' /docker-entrypoint.d/40-pharos-api.sh \
+    && sed -i 's/\r$//' /etc/nginx/conf.d/default.conf \
+    && chmod +x /docker-entrypoint.d/40-pharos-api.sh
+
+EXPOSE 3000
