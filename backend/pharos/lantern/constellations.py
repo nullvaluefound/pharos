@@ -189,8 +189,18 @@ def _candidate_ids(
         return []
     s = get_settings()
     pivot = as_of if as_of is not None else datetime.now(timezone.utc)
-    lower = pivot - timedelta(days=s.cluster_window_days)
-    upper = pivot + timedelta(days=s.cluster_window_days)
+    # Guard against corrupted timestamps in the corpus that would
+    # underflow / overflow timedelta arithmetic (some RSS feeds publish
+    # year-0001 / year-9999 dates).
+    delta = timedelta(days=s.cluster_window_days)
+    try:
+        lower = pivot - delta
+    except (OverflowError, ValueError):
+        lower = datetime.min.replace(tzinfo=pivot.tzinfo)
+    try:
+        upper = pivot + delta
+    except (OverflowError, ValueError):
+        upper = datetime.max.replace(tzinfo=pivot.tzinfo)
     placeholders = ",".join("?" * len(anchors))
     rows = conn.execute(
         f"""
