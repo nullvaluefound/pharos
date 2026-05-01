@@ -1,5 +1,5 @@
 PHAROS PROPRIETARY LICENSE
-Version 1.0, May 2026
+Version 1.1, May 2026
 
 Copyright (c) 2026 nullvaluefound. All rights reserved.
 
@@ -31,56 +31,111 @@ commercial benefit flowing to any party (including you) directly or
 indirectly from access to or operation of the Software.
 
 
-1A. OWNER'S EMPLOYER EXCEPTION
-------------------------------
+1A. OWNER'S CURRENT AND FORMER EMPLOYERS EXCEPTION
+--------------------------------------------------
 As an exception to Sections 2 and 3, the copyright holder (the
-"Owner") and the legal entity that employs, retains, or contracts with
-the Owner at any given time (the "Owner's Employer") -- including the
-directors, officers, employees, contractors, and members of the Owner's
-Employer acting in the scope of their roles for the Owner's Employer --
-are granted a royalty-free, worldwide, non-exclusive license to use,
-deploy, self-host, and internally distribute the Software for the
-internal business purposes of the Owner's Employer, including
-commercial and operational use, without obtaining a separate commercial
-license under Section 3.
+"Owner") grants a royalty-free, worldwide, non-exclusive,
+non-transferable license to use, deploy, self-host, and internally
+distribute the Software for internal business purposes -- including
+ordinary commercial and operational use -- to:
+
+  (i)  the legal entity that currently employs, retains, or contracts
+       with the Owner (the "Owner's Current Employer"); and
+
+  (ii) any legal entity that has previously employed, retained, or
+       contracted with the Owner under a bona fide employment,
+       independent-contractor, or consulting relationship (each, a
+       "Owner's Former Employer"; collectively with the Owner's
+       Current Employer, the "Permitted Employers").
+
+This exception extends to the directors, officers, employees, and
+contractors of any Permitted Employer when they are acting within the
+scope of their roles for that Permitted Employer.
 
 This exception is subject to the following clarifications and limits:
 
-  (a) The exception attaches to the Owner's then-current employer at
-      the time of use. If the Owner changes employers, the exception
-      automatically covers the new employer and ceases to cover the
-      former employer for any new use that begins after the
-      employment relationship ends. Software already deployed under
-      this exception by a former employer must, going forward, either
-      (i) be removed, or (ii) be brought under a commercial license
-      pursuant to Section 3.
-  (b) The exception is internal-use only. It does NOT permit the
-      Owner's Employer to redistribute, sell, sublicense, host as a
-      service to third parties, package into a commercial product, or
-      otherwise convey the Software to anyone outside the Owner's
-      Employer.
-  (c) The exception does NOT permit the Owner's Employer to remove,
-      alter, or replace the Pharos branding, logos, copyright
-      notices, or this license text.
-  (d) The Owner's Employer is not granted any rights in the Pharos
-      name, logo, or trademarks for marketing, product naming, or
-      external-facing materials.
-  (e) The Owner may, at the Owner's sole discretion and at any time,
-      extend, narrow, or revoke this exception by publishing notice in
-      the official repository. Any such change takes effect on
-      publication.
-  (f) This exception does not create any employment, partnership, or
-      agency relationship between the Owner's Employer and the Owner
-      with respect to the Software, and does not obligate the Owner to
+  (a) Scope of use. The exception is for the Permitted Employer's
+      own internal business needs, including self-hosting on
+      infrastructure that the Permitted Employer owns, leases, or
+      operates for itself. It attaches independently to each
+      Permitted Employer and, in the case of an Owner's Former
+      Employer, survives the end of the Owner's engagement with that
+      entity (so an Owner's Former Employer may continue to self-host
+      and use the Software on the same internal-use terms after the
+      Owner has moved on).
+
+  (b) No resale or hosting-as-a-service. The exception is internal-use
+      only. It does NOT permit any Permitted Employer to redistribute,
+      resell, sublicense, host as a service to third parties, package
+      into a commercial product, white-label, repackage, or otherwise
+      convey the Software (in source or compiled form, modified or
+      unmodified) to anyone outside that Permitted Employer.
+
+  (c) No external Pharos-branded offering. A Permitted Employer may
+      use intelligence, reports, and analysis that it generates with
+      the Software for its own purposes (including incorporating such
+      output into work products it delivers to its own customers in
+      the ordinary course of its business), but may NOT market, brand,
+      identify, or hold out any external offering as "Pharos", "powered
+      by Pharos", or under any colorable variant of the Pharos name,
+      lighthouse logo, or "A beam through the noise" tagline.
+
+  (d) No branding alteration. The exception does NOT permit a
+      Permitted Employer to remove, alter, or replace the Pharos
+      branding, logos, copyright notices, or this license text in any
+      copy of the Software it deploys.
+
+  (e) No trademark grant. No Permitted Employer is granted any rights
+      in the Pharos name, logo, or trademarks for marketing, product
+      naming, or external-facing materials.
+
+  (f) Bona fide relationship required. A "Owner's Former Employer"
+      must have engaged the Owner under a bona fide employment,
+      independent-contractor, or consulting agreement of more than
+      de minimis duration and substance. Brief, one-time, gratuitous,
+      merely prospective, or purely ceremonial engagements (including
+      interviews, unpaid trial tasks, single-day events, hackathons,
+      shadow days, and similar) do NOT, on their own, establish an
+      Owner's Former Employer for purposes of this exception.
+
+  (g) Affiliates not automatically included. The exception attaches
+      to the specific legal entity that employed or retained the
+      Owner. It does NOT automatically extend to that entity's parent
+      companies, subsidiaries, affiliates, joint ventures, business
+      partners, successors-in-interest, or acquirers, unless the Owner
+      expressly says so in writing in the official repository. If a
+      Permitted Employer is acquired by, merged into, or reorganized
+      under a different legal entity, that successor entity must
+      either (i) obtain the Owner's written confirmation that the
+      exception transfers, or (ii) bring the Software under a
+      commercial license pursuant to Section 3.
+
+  (h) Owner's discretion. The Owner may, at the Owner's sole
+      discretion and at any time, extend, narrow, suspend, or revoke
+      this exception -- in whole, or with respect to any specific
+      Permitted Employer -- by publishing notice in the official
+      repository. Any such change takes effect on publication. A
+      revocation does not retroactively invalidate prior good-faith
+      use, but the affected Permitted Employer must thereafter cease
+      use or obtain a commercial license under Section 3.
+
+  (i) No relationship implied. This exception does not create any
+      employment, partnership, agency, support, or maintenance
+      relationship between the Owner and any Permitted Employer with
+      respect to the Software, and does not obligate the Owner to
       provide any support, warranty, maintenance, or further
       development.
 
 For the avoidance of doubt: this exception is purely a courtesy
-carve-out granted by the Owner to the Owner's Employer. It does NOT
-extend to any other organization (including parent companies,
-subsidiaries, affiliates, joint ventures, or business partners of the
-Owner's Employer) unless the Owner expressly says so in writing in the
-official repository.
+carve-out granted by the Owner. It does NOT make the Software open
+source, "freely available for enterprise use", or available to
+organizations generally; it applies only to Permitted Employers as
+defined above. It does NOT extend to any organization that has not
+been a bona fide employer, contractor-engager, or consulting client
+of the Owner, and it does NOT extend to such an entity's parents,
+subsidiaries, affiliates, joint ventures, business partners,
+successors, or acquirers unless the Owner expressly says so in
+writing in the official repository.
 
 
 2. RESTRICTIONS -- WHAT YOU MAY NOT DO WITHOUT A COMMERCIAL LICENSE
