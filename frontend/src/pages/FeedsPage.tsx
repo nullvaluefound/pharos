@@ -6,7 +6,9 @@ import {
   Download,
   FolderPlus,
   GripVertical,
+  Pause,
   Pencil,
+  Play,
   Plus,
   RefreshCw,
   Rss,
@@ -808,6 +810,43 @@ function SortableFeedRow({
     await api(`/feeds/${feed.id}`, { method: "DELETE" });
     refresh();
   }
+  async function toggleActive() {
+    const isPaused = feed.is_active === 0;
+    if (!isPaused) {
+      // Pausing: warn the user that pending enrichments will be dropped.
+      if (
+        !confirm(
+          `Pause polling for "${feed.custom_title || feed.title || feed.url}"?\n\n` +
+            "Already-ingested articles stay in your stream. Any articles from " +
+            "this feed still queued for LLM enrichment will be dropped (saves " +
+            "OpenAI cost). You can resume any time.",
+        )
+      )
+        return;
+    }
+    setBusy(true);
+    try {
+      const res = await api<{ pending_dropped: number }>(
+        `/feeds/${feed.id}/active`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ is_active: isPaused }),
+        },
+      );
+      if (!isPaused && res.pending_dropped > 0) {
+        // Pause confirmation toast (cheap and useful):
+        // eslint-disable-next-line no-alert
+        alert(
+          `Paused. ${res.pending_dropped} pending article(s) dropped from the enrichment queue.`,
+        );
+      }
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const paused = feed.is_active === 0;
 
   return (
     <li
@@ -815,9 +854,12 @@ function SortableFeedRow({
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
-        opacity: isDragging ? 0.4 : 1,
+        opacity: isDragging ? 0.4 : paused ? 0.6 : 1,
       }}
-      className="card flex items-center gap-2 p-3"
+      className={
+        "card flex items-center gap-2 p-3 " +
+        (paused ? "border-dashed border-ink-300/60" : "")
+      }
     >
       <button
         {...attributes}
@@ -833,13 +875,27 @@ function SortableFeedRow({
         onChange={toggle}
         className="h-4 w-4 rounded border-ink-300 text-beam-600"
       />
-      <StatusBadge status={feed.last_status} errorCount={feed.error_count} />
+      <StatusBadge
+        status={feed.last_status}
+        errorCount={feed.error_count}
+        paused={paused}
+      />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-ink-900">
-          {feed.custom_title || feed.title || hostFromUrl(feed.url)}
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-medium text-ink-900">
+            {feed.custom_title || feed.title || hostFromUrl(feed.url)}
+          </span>
+          {paused && (
+            <span className="rounded-md bg-ink-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-600">
+              Paused
+            </span>
+          )}
         </div>
         <div className="truncate text-[11px] text-ink-400">
-          {feed.url} · last polled {timeAgo(feed.last_polled_at) || "never"}
+          {feed.url} ·{" "}
+          {paused
+            ? "polling paused"
+            : `last polled ${timeAgo(feed.last_polled_at) || "never"}`}
         </div>
       </div>
       <select
@@ -854,7 +910,22 @@ function SortableFeedRow({
           </option>
         ))}
       </select>
-      <button onClick={poll} className="btn-ghost !py-1" title="Force re-poll">
+      <button
+        onClick={toggleActive}
+        disabled={busy}
+        className={
+          "btn-ghost !py-1 " + (paused ? "text-good-600" : "text-ink-500")
+        }
+        title={paused ? "Resume polling" : "Pause polling (drops pending enrichments)"}
+      >
+        {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+      </button>
+      <button
+        onClick={poll}
+        disabled={paused}
+        className="btn-ghost !py-1 disabled:opacity-30"
+        title={paused ? "Resume the feed first" : "Force re-poll"}
+      >
         <RefreshCw className="h-4 w-4" />
       </button>
       <button onClick={unsubscribe} className="btn-ghost !py-1 text-danger-600">
@@ -880,10 +951,19 @@ function FeedRowGhost({ feed }: { feed: FeedOut | null }) {
 function StatusBadge({
   status,
   errorCount,
+  paused,
 }: {
   status: string | null;
   errorCount: number;
+  paused?: boolean;
 }) {
+  if (paused) {
+    return (
+      <span title="Polling paused">
+        <Pause className="h-4 w-4 text-ink-400" />
+      </span>
+    );
+  }
   if (status === "ok" || status === "200" || status?.startsWith("304")) {
     return (
       <span title={status || "Healthy"}>

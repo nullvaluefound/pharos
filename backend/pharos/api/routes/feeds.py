@@ -374,6 +374,64 @@ def feed_health(feed_id: int,
     )
 
 
+class FeedActiveIn(BaseModel):
+    is_active: bool
+
+
+class FeedActiveOut(BaseModel):
+    id: int
+    is_active: int
+    pending_dropped: int  # how many pending articles were purged on pause
+
+
+@router.patch("/{feed_id}/active", response_model=FeedActiveOut)
+def set_feed_active(feed_id: int,
+                    data: FeedActiveIn,
+                    user: CurrentUser = Depends(get_current_user),
+                    conn: sqlite3.Connection = Depends(get_db)) -> FeedActiveOut:
+    """Pause or resume polling for a feed.
+
+    Pausing (``is_active=False``) flips the global ``feeds.is_active`` flag --
+    the ingestion scheduler picks the change up within ~60s and removes the
+    poll job. Already-ingested articles stay in the stream; we don't
+    retroactively hide them. As a cost-saving side effect, any of THIS
+    feed's articles that are still queued for LLM enrichment
+    (``enrichment_status='pending'``) are dropped, since the user is
+    explicitly saying they don't want this source consuming their budget.
+
+    Authorization: the caller must be subscribed to the feed.
+    """
+    sub = conn.execute(
+        "SELECT 1 FROM subscriptions WHERE user_id = ? AND feed_id = ?",
+        (user.id, feed_id),
+    ).fetchone()
+    if not sub:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not subscribed to this feed")
+
+    cur = conn.execute(
+        "UPDATE feeds SET is_active = ? WHERE id = ?",
+        (1 if data.is_active else 0, feed_id),
+    )
+    if cur.rowcount == 0:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Feed not found")
+
+    pending_dropped = 0
+    if not data.is_active:
+        purge = conn.execute(
+            "DELETE FROM articles "
+            "WHERE feed_id = ? AND enrichment_status = 'pending'",
+            (feed_id,),
+        )
+        pending_dropped = purge.rowcount or 0
+
+    conn.commit()
+    return FeedActiveOut(
+        id=feed_id,
+        is_active=1 if data.is_active else 0,
+        pending_dropped=pending_dropped,
+    )
+
+
 @router.post("/{feed_id}/poll", status_code=status.HTTP_202_ACCEPTED)
 def force_poll(feed_id: int,
                user: CurrentUser = Depends(get_current_user),
