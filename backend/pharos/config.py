@@ -36,9 +36,14 @@ class Settings(BaseSettings):
     archive_after_days: int = Field(default=90, ge=1)
 
     # Constellations
-    cluster_window_days: int = Field(default=7, ge=1)
-    cluster_min_shared: int = Field(default=4, ge=1)
-    cluster_sim_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
+    # Window widened to 14 days because security stories often get late
+    # follow-up analysis pieces 1-2 weeks after the breaking item.
+    cluster_window_days: int = Field(default=14, ge=1)
+    cluster_min_shared: int = Field(default=1, ge=1)
+    # Threshold lowered now that the anchor gate (see constellations.py)
+    # carries the false-positive prevention. The weighted Jaccard score
+    # only needs to clear "meaningful overlap" not "near-identical".
+    cluster_sim_threshold: float = Field(default=0.30, ge=0.0, le=1.0)
 
     # Lantern
     lantern_batch: int = Field(default=10, ge=1)

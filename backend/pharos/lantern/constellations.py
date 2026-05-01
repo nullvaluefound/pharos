@@ -30,17 +30,23 @@ from ..config import get_settings
 
 # Token-namespace weights. Keep in sync with prefixes in fingerprint.py.
 #
-# ANCHOR namespaces (per-event identifiers) -- big weights:
+# STRONG ANCHORS (per-event identifiers, very rarely co-occur on different
+# stories within a 2-week window):
 #   cve   CVE identifier (CVE-YYYY-NNNNN)
 #   mtg   MITRE Group ID (G####)        -- canonical actor
 #   mts   MITRE Software ID (S####)     -- canonical malware/tool
 #   thr   Threat actor canonical name (e.g. "lazarus")
 #   mal   Malware canonical name (e.g. "beavertail")
+#
+# WEAK ANCHORS (per-vendor/company/product identifiers; common enough that
+# template content ("Apple Daily", "NYT Connections") can falsely cluster
+# on them, so the gate requires either >=2 of these OR pairing with at
+# least one strong anchor OR meaningful context overlap):
 #   ven   Vendor (e.g. "anthropic", "cisco")
 #   com   Company (the targeted/affected org, e.g. "bybit")
 #   pro   Product (e.g. "claude-mythos", "exchange-server")
 #
-# CONTEXT namespaces (broad, often shared across unrelated stories):
+# CONTEXT (broad, dilute signal -- bag-of-words tail and taxonomy):
 #   tool  generic tooling
 #   sec   sector
 #   geo   country
@@ -50,15 +56,16 @@ from ..config import get_settings
 # MITRE Techniques (ttp) and Tactics (mta) are NOT in this map -- they are
 # excluded from the fingerprint entirely (see fingerprint.py).
 NAMESPACE_WEIGHTS: dict[str, int] = {
-    # anchors
-    "cve":  10,
-    "mtg":   8,
-    "mts":   8,
-    "thr":   7,
-    "mal":   7,
-    "ven":   5,
-    "com":   5,
-    "pro":   5,
+    # strong anchors -- dominate similarity
+    "cve":  15,
+    "mtg":  12,
+    "mts":  12,
+    "thr":  10,
+    "mal":  10,
+    # weak anchors
+    "ven":   6,
+    "com":   6,
+    "pro":   6,
     # context
     "tool":  2,
     "sec":   1,
@@ -67,11 +74,15 @@ NAMESPACE_WEIGHTS: dict[str, int] = {
     "w":     1,
 }
 
-# Namespaces whose presence (overlap of >=1 token) signals a real per-event
-# match. Without one of these in common, we refuse to cluster two articles.
-ANCHOR_NAMESPACES: frozenset[str] = frozenset({
-    "cve", "mtg", "mts", "thr", "mal", "ven", "com", "pro",
-})
+STRONG_ANCHORS: frozenset[str] = frozenset({"cve", "mtg", "mts", "thr", "mal"})
+WEAK_ANCHORS:   frozenset[str] = frozenset({"ven", "com", "pro"})
+ANCHOR_NAMESPACES: frozenset[str] = STRONG_ANCHORS | WEAK_ANCHORS
+
+# Minimum bag-of-words / topic / sector / geo Jaccard required when ONLY
+# weak anchors overlap. Defeats template false positives like "9to5Mac
+# Daily roundup" or "NYT Connections puzzle of the day" where the same
+# brand mentions recur but the actual content is different every day.
+_WEAK_ONLY_CONTEXT_FLOOR = 0.10
 
 # Defensive: if old data still has ``ttp:`` / ``mta:`` rows in
 # ``article_tokens``, ignore them everywhere.
@@ -91,11 +102,48 @@ def _filter_active(tokens: set[str]) -> set[str]:
     return {t for t in tokens if _ns(t) not in _IGNORED_NAMESPACES}
 
 
+def _context_jaccard(a: set[str], b: set[str]) -> float:
+    """Plain (un-weighted) Jaccard over non-anchor tokens only."""
+    a_ctx = {t for t in a if _ns(t) not in ANCHOR_NAMESPACES}
+    b_ctx = {t for t in b if _ns(t) not in ANCHOR_NAMESPACES}
+    if not a_ctx and not b_ctx:
+        return 0.0
+    inter = a_ctx & b_ctx
+    union = a_ctx | b_ctx
+    return len(inter) / len(union) if union else 0.0
+
+
 def has_anchor_overlap(a: set[str], b: set[str]) -> bool:
-    """Return True iff ``a`` and ``b`` share >=1 ANCHOR-namespace token."""
-    for token in a & b:
-        if _ns(token) in ANCHOR_NAMESPACES:
-            return True
+    """Backwards-compatible: True iff ``a`` and ``b`` share >=1 anchor token.
+
+    Used by tests + the API ``/articles/{id}/related`` endpoint. The full
+    cluster gate that also considers context lives in
+    :func:`should_consider_cluster`.
+    """
+    return any(_ns(t) in ANCHOR_NAMESPACES for t in a & b)
+
+
+def should_consider_cluster(a: set[str], b: set[str]) -> bool:
+    """The actual cluster gate. Returns True when ``a`` and ``b`` are
+    eligible to be evaluated for clustering.
+
+    Rules:
+      * They share >=1 STRONG anchor (cve / mtg / mts / thr / mal), OR
+      * They share >=2 WEAK anchors AND have non-trivial context overlap
+        (catches Bloomberg/Gizmodo on same M&A story; rejects
+        9to5Mac-Daily-style template duplicates).
+    """
+    a = _filter_active(a)
+    b = _filter_active(b)
+    shared = a & b
+    if not shared:
+        return False
+    n_strong = sum(1 for t in shared if _ns(t) in STRONG_ANCHORS)
+    if n_strong >= 1:
+        return True
+    n_weak = sum(1 for t in shared if _ns(t) in WEAK_ANCHORS)
+    if n_weak >= 2 and _context_jaccard(a, b) >= _WEAK_ONLY_CONTEXT_FLOOR:
+        return True
     return False
 
 
@@ -178,10 +226,9 @@ def assign_constellation(
 
     for cand_id, _shared in candidates:
         cand_tokens = _tokens_for(conn, cand_id)
-        # Hard gate: must share at least one per-event identifier (CVE,
-        # MITRE Group/Software, canonical actor/malware, vendor, company,
-        # product). This is the single biggest false-positive killer.
-        if not has_anchor_overlap(token_set, cand_tokens):
+        # Hard gate: at least one strong per-event identifier in common,
+        # OR multiple weak anchors backed by some context overlap.
+        if not should_consider_cluster(token_set, cand_tokens):
             continue
         sim = weighted_jaccard(token_set, cand_tokens)
         if sim < s.cluster_sim_threshold:

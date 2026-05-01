@@ -50,19 +50,19 @@ Every enriched article gets a sorted, de-duplicated list of
 **namespaced tokens** stored in `articles.fingerprint` (and exploded
 into the `article_tokens` inverted index). Namespaces:
 
-| Prefix | Meaning | Weight | Anchor? |
+| Prefix | Meaning | Weight | Anchor tier |
 |---|---|---|---|
-| `cve` | CVE identifier | 10 | yes |
-| `mtg` | MITRE Group ID (G####) | 8 | yes |
-| `mts` | MITRE Software ID (S####) | 8 | yes |
-| `thr` | threat actor canonical name | 7 | yes |
-| `mal` | malware canonical name | 7 | yes |
-| `ven` | vendor (e.g. `cisco`, `anthropic`) | 5 | yes |
-| `com` | company / targeted org | 5 | yes |
-| `pro` | product (e.g. `claude-mythos`) | 5 | yes |
-| `tool` | generic tooling | 2 | no |
-| `sec`, `geo`, `top` | sector / country / topic | 1 | no |
-| `w` | bag-of-words fallback (title + key_points, stopwords removed) | 1 | no |
+| `cve` | CVE identifier | 15 | strong |
+| `mtg` | MITRE Group ID (G####) | 12 | strong |
+| `mts` | MITRE Software ID (S####) | 12 | strong |
+| `thr` | threat actor canonical name | 10 | strong |
+| `mal` | malware canonical name | 10 | strong |
+| `ven` | vendor (e.g. `cisco`, `anthropic`) | 6 | weak |
+| `com` | company / targeted org | 6 | weak |
+| `pro` | product (e.g. `claude-mythos`) | 6 | weak |
+| `tool` | generic tooling | 2 | context |
+| `sec`, `geo`, `top` | sector / country / topic | 1 | context |
+| `w` | bag-of-words fallback (title + key_points, stopwords removed) | 1 | context |
 
 **MITRE Techniques (`T####`) and Tactics (`TA####`) are intentionally
 NOT in the fingerprint.** They stay on the article entity payload and
@@ -70,9 +70,19 @@ render in the UI, but they're excluded from clustering — the LLM
 over-extracts recon TTPs (`T1589` / `T1590` / `T1592` etc.) so they
 cause unrelated stories to falsely cluster.
 
-Cluster identity is "anchored" on per-event identifiers (the columns
-marked above). Two articles must share at least one anchor token before
-similarity is even considered — see step 3 of the algorithm below.
+Cluster identity is "anchored" on per-event identifiers, split into two
+tiers:
+
+- **Strong anchor (≥1 shared)** is sufficient on its own — a single
+  shared CVE, MITRE Group/Software ID, canonical actor or malware name
+  is solid evidence of the same story.
+- **Weak anchors (≥2 shared)** also qualify, but only when the two
+  articles also have non-trivial *context overlap* (Jaccard of
+  bag-of-words/topic/sector tokens ≥ 0.10). This blocks template
+  false positives like "9to5Mac Daily" or "NYT Connections puzzle"
+  where the same brand mentions recur but the actual content differs.
+
+Both gates are implemented in `should_consider_cluster()`.
 
 Tokens are lowercase. Why namespaces? So that the bag-of-words token
 `w:apple` can never collide with the company `com:apple` or a product
@@ -97,7 +107,7 @@ CONFIG: CLUSTER_WINDOW_DAYS, CLUSTER_MIN_SHARED, CLUSTER_SIM_THRESHOLD
    If A has no anchor tokens, A starts its own cluster -- no candidates.
 
 3. For each candidate C:
-       if anchors(F) ∩ anchors(tokens(C)) == ∅: skip   # anchor gate
+       if not should_consider_cluster(F, tokens(C)): skip   # tiered gate
        sim = weighted_jaccard(F, tokens(C))
        if sim < CLUSTER_SIM_THRESHOLD: skip
        cluster = articles(C).story_cluster_id
