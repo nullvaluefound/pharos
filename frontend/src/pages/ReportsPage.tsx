@@ -837,7 +837,29 @@ function ReportView({
           <div className="mt-1 text-xs text-danger-700">{detail.error}</div>
         </div>
       ) : (
-        <article className="card prose prose-sm max-w-none p-8 prose-headings:font-bold prose-h2:mt-8 prose-h2:border-b prose-h2:border-ink-200 prose-h2:pb-2 prose-h2:text-lg prose-h3:text-base prose-a:text-beam-600 prose-strong:text-ink-900">
+        <article
+          className={[
+            "card max-w-none p-8",
+            // Base typography
+            "prose prose-sm dark:prose-invert",
+            // Headings
+            "prose-headings:font-bold",
+            "prose-h2:mt-8 prose-h2:border-b prose-h2:pb-2 prose-h2:text-lg",
+            "prose-h2:border-ink-200 dark:prose-h2:border-pharos-navy-500",
+            "prose-h3:text-base",
+            // Body / inline elements -- explicit white-on-dark for the body
+            // copy because the default prose-invert grays are still too dim
+            // against our near-black canvas.
+            "prose-p:text-ink-800 dark:prose-p:text-white",
+            "prose-li:text-ink-800 dark:prose-li:text-white",
+            "prose-strong:text-ink-900 dark:prose-strong:text-white",
+            "prose-em:text-ink-800 dark:prose-em:text-white",
+            "prose-blockquote:text-ink-700 dark:prose-blockquote:text-ink-200",
+            "prose-code:text-ink-900 dark:prose-code:text-pharos-gold-300",
+            // Links use the brand beam color in both modes
+            "prose-a:text-beam-600 dark:prose-a:text-pharos-gold-400",
+          ].join(" ")}
+        >
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {detail.body_md}
           </ReactMarkdown>
