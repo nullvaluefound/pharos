@@ -19,10 +19,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from ...reports import (
+    MAX_ARTICLES,
     ReportRequest,
     collect_articles,
+    count_articles_in_scope,
+    estimate_cost,
     generate_report,
 )
+from ...reports.prompts import length_targets
 from ..deps import CurrentUser, get_current_user, get_db
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -74,7 +78,10 @@ class ReportDetail(ReportListItem):
 
 
 class ReportPreviewOut(BaseModel):
-    article_count: int
+    article_count: int                  # true total in scope (uncapped)
+    used_count: int                     # min(article_count, MAX_ARTICLES)
+    cap: int                            # MAX_ARTICLES
+    capped: bool                        # True iff article_count > cap
     sample: list[dict]
     estimated_cost_usd: float
 
@@ -156,8 +163,19 @@ def preview_report(data: ReportGenerateIn,
                    user: CurrentUser = Depends(get_current_user),
                    conn: sqlite3.Connection = Depends(get_db)) -> ReportPreviewOut:
     """Tell the user how many articles their filter would pull and rough
-    cost, without spending any OpenAI credit."""
-    rows = collect_articles(conn, user_id=user.id, req=_to_dataclass(data))
+    cost, without spending any OpenAI credit.
+
+    ``article_count`` is the TRUE total of articles matching the filter
+    (uncapped). ``used_count`` is what the report will actually consume
+    (capped at MAX_ARTICLES). Cost is estimated against ``used_count``
+    so the displayed cost is what the user will actually be charged.
+    """
+    req = _to_dataclass(data)
+    total = count_articles_in_scope(conn, user_id=user.id, req=req)
+    used = min(total, MAX_ARTICLES)
+
+    # Pull a small sample for display only; cap at 8 to keep the response light.
+    sample_rows = collect_articles(conn, user_id=user.id, req=req, limit=8)
     sample = [
         {
             "id": r["id"],
@@ -167,17 +185,21 @@ def preview_report(data: ReportGenerateIn,
             "published_at": r["published_at"],
             "severity_hint": r.get("severity_hint"),
         }
-        for r in rows[:8]
+        for r in sample_rows
     ]
-    # Rough cost heuristic: each article-block ~250 tokens of prompt input,
-    # plus ~600 tokens system prompt. Output bounded by length_target.
-    est_input = 600 + len(rows) * 250
-    from ...reports import estimate_cost
-    from ...reports.prompts import length_targets
+
+    # Cost heuristic: each article block ~250 input tokens + ~600 token
+    # system prompt. Output bounded by length target. Half the output
+    # ceiling is a reasonable mean for what the model actually emits.
+    est_input = 600 + used * 250
     _, _, est_output = length_targets(data.length)
     est_cost = estimate_cost(est_input, est_output // 2)
+
     return ReportPreviewOut(
-        article_count=len(rows),
+        article_count=total,
+        used_count=used,
+        cap=MAX_ARTICLES,
+        capped=total > MAX_ARTICLES,
         sample=sample,
         estimated_cost_usd=round(est_cost, 4),
     )

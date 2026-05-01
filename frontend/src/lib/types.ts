@@ -205,7 +205,10 @@ export interface ReportDetail extends ReportListItem {
 }
 
 export interface ReportPreview {
-  article_count: number;
+  article_count: number;        // true total in scope (uncapped)
+  used_count: number;           // min(article_count, cap) -- what report actually consumes
+  cap: number;                  // server-side MAX_ARTICLES
+  capped: boolean;              // true iff article_count > cap
   sample: {
     id: number;
     title: string | null;

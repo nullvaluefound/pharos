@@ -100,14 +100,20 @@ def _entity_id_set(conn: sqlite3.Connection, type_: str,
     return [r["id"] for r in rows]
 
 
-def collect_articles(conn: sqlite3.Connection, *, user_id: int,
-                     req: ReportRequest, limit: int = MAX_ARTICLES) -> list[dict]:
-    """Resolve ``req`` into the article rows the report should consume.
+def _build_filter(
+    conn: sqlite3.Connection,
+    *,
+    user_id: int,
+    req: ReportRequest,
+) -> tuple[list[str], list[Any], bool]:
+    """Build the shared WHERE clause + params for both ``collect_articles``
+    and ``count_articles_in_scope``.
 
-    Returns ordered-by-published-DESC list of plain dicts containing the
-    fields the prompt builder needs. Mirrors search.py logic so behavior
-    is consistent with what the user would see in /search."""
-    where = ["s.user_id = ?"]
+    Returns ``(where, params, empty_corpus)``. ``empty_corpus`` is True
+    when the user asked for entities that don't exist anywhere -- the
+    caller should short-circuit to an empty result.
+    """
+    where: list[str] = ["s.user_id = ?"]
     params: list[Any] = [user_id]
 
     if req.feed_ids:
@@ -119,16 +125,13 @@ def collect_articles(conn: sqlite3.Connection, *, user_id: int,
         where.append("a.published_at > datetime('now', ?)")
         params.append(f"-{int(req.since_days)} days")
 
-    # Keyword OR filter via FTS5. Group keywords with OR.
     if req.keywords:
-        # Sanitize: strip out FTS metacharacters that would break the parse.
         cleaned = [
             "".join(ch for ch in k if ch.isalnum() or ch in " -_")
             for k in req.keywords if k and k.strip()
         ]
         cleaned = [c.strip() for c in cleaned if c.strip()]
         if cleaned:
-            # FTS5 OR: "alpha" OR "beta gamma"
             fts_query = " OR ".join(f'"{c}"' for c in cleaned)
             where.append(
                 "a.id IN (SELECT rowid FROM main.articles_fts "
@@ -136,13 +139,11 @@ def collect_articles(conn: sqlite3.Connection, *, user_id: int,
             )
             params.append(fts_query)
 
-    # any_of: union of entity matches
     any_ids: list[int] = []
     for t, names in (req.any_of or {}).items():
         any_ids.extend(_entity_id_set(conn, t, names))
     if req.any_of and not any_ids:
-        # User asked for entities that don't exist -> empty corpus.
-        return []
+        return where, params, True
     if any_ids:
         ph = ",".join("?" * len(any_ids))
         where.append(
@@ -151,7 +152,6 @@ def collect_articles(conn: sqlite3.Connection, *, user_id: int,
         )
         params.extend(any_ids)
 
-    # all_of: each entity must be present
     for t, names in (req.all_of or {}).items():
         for eid in _entity_id_set(conn, t, names):
             where.append(
@@ -160,7 +160,6 @@ def collect_articles(conn: sqlite3.Connection, *, user_id: int,
             )
             params.append(eid)
 
-    # has_entity_types: e.g. require ANY threat_actor entity
     for etype in req.has_entity_types or []:
         where.append(
             "a.id IN (SELECT ae.article_id FROM main.article_entities ae "
@@ -171,6 +170,44 @@ def collect_articles(conn: sqlite3.Connection, *, user_id: int,
     # Only enriched articles -- a report on un-enriched data has no metadata
     # to ground the model.
     where.append("a.enrichment_status = 'enriched'")
+    return where, params, False
+
+
+def count_articles_in_scope(
+    conn: sqlite3.Connection, *, user_id: int, req: ReportRequest
+) -> int:
+    """Return the TOTAL number of articles that match the report filter,
+    BEFORE the MAX_ARTICLES cap is applied. This is what the preview UI
+    should display so changing ``since_days`` / keywords / etc. actually
+    moves the number around (otherwise everything saturates at 200)."""
+    where, params, empty = _build_filter(conn, user_id=user_id, req=req)
+    if empty:
+        return 0
+    sql = f"""
+        SELECT COUNT(*) AS c
+          FROM all_articles a
+          JOIN main.subscriptions s ON s.feed_id = a.feed_id
+         WHERE {' AND '.join(where)}
+    """
+    row = conn.execute(sql, params).fetchone()
+    return int(row["c"]) if row else 0
+
+
+def collect_articles(conn: sqlite3.Connection, *, user_id: int,
+                     req: ReportRequest, limit: int = MAX_ARTICLES) -> list[dict]:
+    """Resolve ``req`` into the article rows the report should consume.
+
+    Returns ordered-by-published-DESC list of plain dicts containing the
+    fields the prompt builder needs. Mirrors search.py logic so behavior
+    is consistent with what the user would see in /search.
+
+    The result is capped at ``limit`` (``MAX_ARTICLES`` by default) to
+    bound LLM cost. Use :func:`count_articles_in_scope` for the un-capped
+    total count (e.g. for the preview UI).
+    """
+    where, params, empty = _build_filter(conn, user_id=user_id, req=req)
+    if empty:
+        return []
 
     sql = f"""
         SELECT a.id, a.feed_id, f.title AS feed_title, a.url, a.title,

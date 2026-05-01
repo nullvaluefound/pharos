@@ -9,17 +9,21 @@ Public surface:
   - ``ReportRequest`` / ``ReportResult`` dataclasses
 """
 from .generator import (
+    MAX_ARTICLES,
     ReportRequest,
     ReportResult,
     collect_articles,
-    generate_report,
+    count_articles_in_scope,
     estimate_cost,
+    generate_report,
 )
 
 __all__ = [
+    "MAX_ARTICLES",
     "ReportRequest",
     "ReportResult",
     "collect_articles",
-    "generate_report",
+    "count_articles_in_scope",
     "estimate_cost",
+    "generate_report",
 ]

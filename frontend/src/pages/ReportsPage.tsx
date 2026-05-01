@@ -548,14 +548,14 @@ Recommendations`}
               ) : preview ? (
                 <div className="mt-2">
                   <div className="text-2xl font-bold text-ink-900">
-                    {preview.article_count}
+                    {preview.article_count.toLocaleString()}
                   </div>
                   <div className="text-xs text-ink-500">
                     matching enriched articles
                   </div>
-                  {preview.article_count > 200 && (
+                  {preview.capped && (
                     <div className="mt-1 text-[11px] text-amber-600">
-                      Will analyze most-recent 200 (cap).
+                      Will analyze most-recent {preview.cap.toLocaleString()} (cap).
                     </div>
                   )}
                   {preview.article_count === 0 && (
@@ -565,6 +565,11 @@ Recommendations`}
                   )}
                   <div className="mt-3 text-[11px] text-ink-500">
                     Estimated cost: <strong>${preview.estimated_cost_usd.toFixed(3)}</strong>
+                    {preview.capped && (
+                      <span className="text-ink-400">
+                        {" "}(for {preview.used_count.toLocaleString()} articles)
+                      </span>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -587,7 +592,7 @@ Recommendations`}
                   ))}
                   {preview.article_count > preview.sample.length && (
                     <li className="italic text-ink-400">
-                      +{preview.article_count - preview.sample.length} more
+                      +{(preview.article_count - preview.sample.length).toLocaleString()} more
                     </li>
                   )}
                 </ul>
