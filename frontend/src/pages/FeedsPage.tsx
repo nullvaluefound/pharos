@@ -4,6 +4,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Download,
+  Eye,
+  EyeOff,
   FolderPlus,
   GripVertical,
   Pause,
@@ -81,9 +83,29 @@ const isFeedId = (id: string | number) =>
 const folderName = (id: string) => id.slice("folder:".length);
 const feedNum = (id: string) => Number(id.slice("feed:".length));
 
+const HIDE_PAUSED_KEY = "pharos.feeds.hidePaused";
+
 export function FeedsPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<"my" | "discover">("my");
+
+  // Sticky preference: hide paused feeds from the list. Defaults to false
+  // so a fresh session shows everything; once flipped, the choice persists
+  // across reloads via localStorage.
+  const [hidePaused, setHidePaused] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(HIDE_PAUSED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(HIDE_PAUSED_KEY, hidePaused ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [hidePaused]);
 
   const feedsQ = useQuery<FeedOut[]>({
     queryKey: ["feeds"],
@@ -301,6 +323,26 @@ export function FeedsPage() {
     [order, foldersQ.data],
   );
 
+  // How many feeds are currently paused -- shown in the "Hide paused" pill
+  // so the user knows the toggle has a non-zero effect.
+  const pausedCount = useMemo(
+    () => (feedsQ.data || []).filter((f) => f.is_active === 0).length,
+    [feedsQ.data],
+  );
+
+  // Render-time filter: when hidePaused is true, drop paused feeds from
+  // each folder's list. We keep the source-of-truth `order` untouched so
+  // drag-reorders still produce sensible sort_order values for everything.
+  const displayByFolder = useMemo(() => {
+    if (!order) return null;
+    if (!hidePaused) return order.byFolder;
+    const out: Record<string, FeedOut[]> = {};
+    for (const [k, v] of Object.entries(order.byFolder)) {
+      out[k] = v.filter((f) => f.is_active !== 0);
+    }
+    return out;
+  }, [order, hidePaused]);
+
   return (
     <div className="mx-auto max-w-5xl px-5 py-6">
       <PageHeader
@@ -308,6 +350,30 @@ export function FeedsPage() {
         subtitle="Drag to reorder. Drop a feed onto a group to move it."
         actions={
           <div className="flex gap-2">
+            <button
+              onClick={() => setHidePaused((v) => !v)}
+              className={
+                "btn-secondary " +
+                (hidePaused ? "!border-beam-500 !text-beam-700" : "")
+              }
+              title={
+                hidePaused
+                  ? "Currently hiding paused feeds — click to show them"
+                  : "Hide paused feeds from the list"
+              }
+              disabled={pausedCount === 0 && !hidePaused}
+            >
+              {hidePaused ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+              {hidePaused
+                ? `Hiding ${pausedCount} paused`
+                : pausedCount > 0
+                  ? `Hide paused (${pausedCount})`
+                  : "Hide paused"}
+            </button>
             <OpmlExportBtn />
             <OpmlImportBtn onDone={refetchAll} />
           </div>
@@ -378,7 +444,7 @@ export function FeedsPage() {
             />
           )}
 
-          {feedsQ.isLoading || !order ? (
+          {feedsQ.isLoading || !order || !displayByFolder ? (
             <div className="card h-40 animate-pulse bg-ink-100/50" />
           ) : (feedsQ.data || []).length === 0 ? (
             <Empty
@@ -398,17 +464,23 @@ export function FeedsPage() {
                 strategy={verticalListSortingStrategy}
               >
                 <div className="space-y-5">
-                  {order.folders.map((name) => (
-                    <SortableFolderBlock
-                      key={name}
-                      folder={name}
-                      feeds={order.byFolder[name] || []}
-                      allFolders={folderNames}
-                      selected={selected}
-                      toggle={toggleSel}
-                      refresh={refetchAll}
-                    />
-                  ))}
+                  {order.folders.map((name) => {
+                    const visible = displayByFolder[name] || [];
+                    const total = order.byFolder[name]?.length ?? 0;
+                    const hiddenInThisFolder = total - visible.length;
+                    return (
+                      <SortableFolderBlock
+                        key={name}
+                        folder={name}
+                        feeds={visible}
+                        hiddenCount={hiddenInThisFolder}
+                        allFolders={folderNames}
+                        selected={selected}
+                        toggle={toggleSel}
+                        refresh={refetchAll}
+                      />
+                    );
+                  })}
                 </div>
               </SortableContext>
 
@@ -651,6 +723,7 @@ function BulkBar({
 function SortableFolderBlock({
   folder,
   feeds,
+  hiddenCount = 0,
   allFolders,
   selected,
   toggle,
@@ -658,6 +731,7 @@ function SortableFolderBlock({
 }: {
   folder: string;
   feeds: FeedOut[];
+  hiddenCount?: number;
   allFolders: string[];
   selected: Set<number>;
   toggle: (id: number) => void;
@@ -726,6 +800,14 @@ function SortableFolderBlock({
           {folder}
         </h3>
         <span className="text-xs text-ink-400">{feeds.length}</span>
+        {hiddenCount > 0 && (
+          <span
+            className="text-[11px] italic text-ink-400"
+            title={`${hiddenCount} paused feed(s) hidden in this group`}
+          >
+            (+{hiddenCount} paused hidden)
+          </span>
+        )}
       </header>
 
       <SortableContext
@@ -734,7 +816,9 @@ function SortableFolderBlock({
       >
         {feeds.length === 0 ? (
           <p className="rounded-lg border border-dashed border-ink-200 px-4 py-3 text-xs italic text-ink-400">
-            Empty group — drop a feed here to add it.
+            {hiddenCount > 0
+              ? `All ${hiddenCount} feed(s) in this group are paused and hidden.`
+              : "Empty group — drop a feed here to add it."}
           </p>
         ) : (
           <ul className="space-y-1.5">
