@@ -9,13 +9,37 @@
   }
   ::selection { background-color: rgb(37 99 235 / 0.2); }
 
-  /* Dark-mode body baseline. Brand palette: pharos.navy.800 (#0b1224)
-     for the canvas, ink-100 equivalent for primary text. */
+  /* Dark-mode body baseline. Inky near-black with a soft top-down
+     gradient and a faint gold radial glow so the canvas feels like the
+     night sky behind the lighthouse, not a flat navy panel. */
   .dark body {
-    background-color: #0b1224;
     color: #e4e4e7;
+    background-color: #04060c;
+    background-image:
+      radial-gradient(ellipse 80% 60% at 50% -10%,
+        rgba(232, 169, 60, 0.07) 0%,
+        rgba(232, 169, 60, 0) 60%),
+      radial-gradient(ellipse 100% 80% at 50% 110%,
+        rgba(7, 10, 17, 0.9) 0%,
+        rgba(0, 0, 0, 0) 70%),
+      linear-gradient(180deg, #07090f 0%, #04060c 50%, #020308 100%);
+    background-attachment: fixed;
   }
   .dark ::selection { background-color: rgb(232 169 60 / 0.35); }
+
+  /* Auth-page background (covers BOTH light + dark variants). On dark
+     it inherits the body gradient; on light it gets a soft warm tint. */
+  .bg-auth {
+    background:
+      linear-gradient(135deg, #fafafa 0%, #ffffff 40%, #eff6ff 100%);
+  }
+  .dark .bg-auth {
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 0%,
+        rgba(232, 169, 60, 0.10) 0%,
+        rgba(232, 169, 60, 0) 65%),
+      linear-gradient(180deg, #07090f 0%, #04060c 60%, #020308 100%);
+  }
 }
 
 @layer components {
@@ -97,16 +121,21 @@
  * common utility classes the existing UI relies on to brand-dark equivalents
  * here. This keeps the diff small and dark mode consistent everywhere.
  * --------------------------------------------------------------------------*/
-.dark .bg-white { background-color: #0f1828 !important; }       /* pharos-navy-700 */
-.dark .bg-ink-50 { background-color: #0b1224 !important; }       /* body/canvas */
-.dark .bg-ink-100 { background-color: #131c30 !important; }      /* hover surface */
-.dark .bg-ink-100\/50 { background-color: rgb(19 28 48 / 0.5) !important; }
-.dark .bg-ink-200 { background-color: #1a2742 !important; }
-.dark .bg-ink-300 { background-color: #2f3f60 !important; }
+.dark .bg-white { background-color: #070a11 !important; }       /* pharos-navy-700 */
+.dark .bg-white\/95 { background-color: rgb(7 10 17 / 0.95) !important; }
+.dark .bg-white\/90 { background-color: rgb(7 10 17 / 0.90) !important; }
+.dark .bg-white\/80 { background-color: rgb(7 10 17 / 0.80) !important; }
+.dark .bg-white\/75 { background-color: rgb(7 10 17 / 0.75) !important; }
+.dark .bg-white\/50 { background-color: rgb(7 10 17 / 0.50) !important; }
+.dark .bg-ink-50 { background-color: #04060c !important; }       /* body/canvas */
+.dark .bg-ink-100 { background-color: #0a0d16 !important; }      /* hover surface */
+.dark .bg-ink-100\/50 { background-color: rgb(10 13 22 / 0.5) !important; }
+.dark .bg-ink-200 { background-color: #10141f !important; }
+.dark .bg-ink-300 { background-color: #1c2233 !important; }
 
-.dark .border-ink-100 { border-color: #131c30 !important; }
-.dark .border-ink-200 { border-color: #1a2742 !important; }
-.dark .border-ink-300 { border-color: #2f3f60 !important; }
+.dark .border-ink-100 { border-color: #0a0d16 !important; }
+.dark .border-ink-200 { border-color: #10141f !important; }
+.dark .border-ink-300 { border-color: #1c2233 !important; }
 
 .dark .text-ink-300 { color: #a1a1aa !important; }
 .dark .text-ink-400 { color: #a1a1aa !important; }
@@ -117,8 +146,8 @@
 .dark .text-ink-900 { color: #fafafa !important; }
 
 /* Hover accents pick up brand gold instead of bright blue */
-.dark .hover\:bg-ink-50:hover { background-color: #131c30 !important; }
-.dark .hover\:bg-ink-100:hover { background-color: #1a2742 !important; }
+.dark .hover\:bg-ink-50:hover { background-color: #0a0d16 !important; }
+.dark .hover\:bg-ink-100:hover { background-color: #10141f !important; }
 
 /* Beam (blue) accents stay legible -- shift to softer gold-tinted variants
    for the most common surface/foreground tints, but keep beam buttons since

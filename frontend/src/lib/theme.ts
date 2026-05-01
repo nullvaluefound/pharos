@@ -12,10 +12,13 @@ function systemPrefersDark(): boolean {
 }
 
 function readStored(): Theme {
-  if (typeof localStorage === "undefined") return "system";
+  // Default to dark mode whenever a user has not made an explicit choice.
+  // (Most threat-intel reading happens at night, and the brand mark is
+  // designed for a dark canvas.)
+  if (typeof localStorage === "undefined") return "dark";
   const v = localStorage.getItem(STORAGE_KEY);
   if (v === "light" || v === "dark" || v === "system") return v;
-  return "system";
+  return "dark";
 }
 
 export function effectiveDark(theme: Theme): boolean {
@@ -33,7 +36,7 @@ function apply(theme: Theme) {
   const metas = document.querySelectorAll<HTMLMetaElement>(
     'meta[name="theme-color"]',
   );
-  metas.forEach((m) => (m.content = dark ? "#0b1224" : "#fafafa"));
+  metas.forEach((m) => (m.content = dark ? "#04060c" : "#fafafa"));
 }
 
 interface PreferencesPayload {

@@ -42,8 +42,13 @@ NS_PRODUCT = "pro"
 NS_CVE = "cve"              # CVE-#### identifier
 NS_MITRE_GROUP = "mtg"      # MITRE Group ID (G####)
 NS_MITRE_SOFTWARE = "mts"   # MITRE Software ID (S####)
-NS_MITRE_TACTIC = "mta"     # MITRE Tactic ID (TA####)
-NS_TTP = "ttp"              # MITRE Technique / Sub-technique (T####, T####.###)
+# NOTE: MITRE Techniques (T####) and Tactics (TA####) are intentionally
+# EXCLUDED from the clustering fingerprint. They're kept on each article's
+# entity payload (so the UI still renders them), but recon/discovery TTPs
+# like T1589 / T1590 / T1592 get over-extracted by the LLM and end up in
+# almost every threat report -- which causes unrelated stories to falsely
+# cluster together. Cluster identity is anchored on actors, malware, CVEs,
+# vendors/products/companies, sectors, geography, and free-text instead.
 NS_SECTOR = "sec"
 NS_COUNTRY = "geo"
 NS_TOPIC = "top"
@@ -108,23 +113,12 @@ def build_fingerprint(article: EnrichedArticle, *, title: str | None) -> list[st
         if n:
             tokens.add(f"{NS_CVE}:{n}")
 
-    for ttp in e.ttps_mitre:
-        n = _normalize(ttp)
-        if n:
-            tokens.add(f"{NS_TTP}:{n}")
-            # Sub-techniques (T####.###) also collapse to the parent technique
-            # so that two articles referencing different sub-techniques of the
-            # same parent still share a clustering signal.
-            if "." in n:
-                parent = n.split(".", 1)[0]
-                tokens.add(f"{NS_TTP}:{parent}")
-
+    # NOTE: ``e.ttps_mitre`` and ``e.mitre_tactics`` are intentionally NOT
+    # added to the fingerprint -- see module docstring above NS_SECTOR.
     for gid in e.mitre_groups:
         tokens.add(f"{NS_MITRE_GROUP}:{gid.lower()}")
     for sid in e.mitre_software:
         tokens.add(f"{NS_MITRE_SOFTWARE}:{sid.lower()}")
-    for tid in e.mitre_tactics:
-        tokens.add(f"{NS_MITRE_TACTIC}:{tid.lower()}")
 
     for s in e.sectors:
         n = _normalize(s)

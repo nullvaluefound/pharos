@@ -43,17 +43,21 @@ Anything that doesn't match the regex is rejected at the pydantic boundary.
 
 4. **Clustering.** The fingerprint builder
    ([`pharos/lantern/fingerprint.py`](../backend/pharos/lantern/fingerprint.py))
-   adds the canonical IDs as namespaced tokens:
-   - `mtg:g0016` (Group)
-   - `mts:s0154` (Software)
-   - `ttp:t1566.001` plus `ttp:t1566` (sub-technique always implies parent)
-   - `mta:ta0001` (Tactic)
+   adds canonical Group / Software IDs as namespaced tokens used for
+   clustering:
+   - `mtg:g0016` (Group)        — anchor, weight 8
+   - `mts:s0154` (Software)     — anchor, weight 8
 
-   These tokens carry the **highest weights** in the constellation
-   clusterer (`mtg` and `mts` weight 5; `ttp` weight 4; `mta` weight 3).
-   The result: two articles that both mention `G0016` and `T1566.001` will
-   cluster together even if they describe APT29 with different language
-   and target different victims.
+   MITRE Techniques (`T####`) and Tactics (`TA####`) are kept on the
+   article entity payload (so the UI renders them) but **excluded from
+   the clustering fingerprint**. Recon-focused techniques (T1589 / T1590
+   / T1592 …) are over-extracted by the LLM and appear in nearly every
+   threat report, which would cause unrelated stories to falsely
+   cluster. See [`LANTERN.md`](LANTERN.md#the-fingerprint).
+
+   The result: two articles that both mention `G0016` cluster together
+   only when they also share at least one other anchor identifier
+   (CVE, malware, vendor, …) and weighted-Jaccard crosses threshold.
 
 5. **Frontend.** The article detail endpoint
    ([`pharos/api/routes/articles.py`](../backend/pharos/api/routes/articles.py))

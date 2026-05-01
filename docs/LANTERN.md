@@ -50,25 +50,33 @@ Every enriched article gets a sorted, de-duplicated list of
 **namespaced tokens** stored in `articles.fingerprint` (and exploded
 into the `article_tokens` inverted index). Namespaces:
 
-| Prefix | Meaning | Weight |
-|---|---|---|
-| `cve` | CVE identifier | 5 |
-| `mtg` | MITRE Group ID (G####) | 5 |
-| `mts` | MITRE Software ID (S####) | 5 |
-| `ttp` | MITRE Technique / Sub-technique | 4 |
-| `mta` | MITRE Tactic | 3 |
-| `thr` | threat actor canonical name | 4 |
-| `mal` | malware canonical name | 3 |
-| `tool`, `pro`, `com`, `ven` | tool / product / company / vendor | 2 |
-| `sec`, `geo`, `top` | sector / country / topic | 1 |
-| `w` | bag-of-words fallback (title + key_points, stopwords removed) | 1 |
+| Prefix | Meaning | Weight | Anchor? |
+|---|---|---|---|
+| `cve` | CVE identifier | 10 | yes |
+| `mtg` | MITRE Group ID (G####) | 8 | yes |
+| `mts` | MITRE Software ID (S####) | 8 | yes |
+| `thr` | threat actor canonical name | 7 | yes |
+| `mal` | malware canonical name | 7 | yes |
+| `ven` | vendor (e.g. `cisco`, `anthropic`) | 5 | yes |
+| `com` | company / targeted org | 5 | yes |
+| `pro` | product (e.g. `claude-mythos`) | 5 | yes |
+| `tool` | generic tooling | 2 | no |
+| `sec`, `geo`, `top` | sector / country / topic | 1 | no |
+| `w` | bag-of-words fallback (title + key_points, stopwords removed) | 1 | no |
 
-Tokens are lowercase. Sub-techniques (`ttp:t1566.001`) also imply the
-parent (`ttp:t1566`) so two articles citing different sub-techniques of
-the same parent still share signal.
+**MITRE Techniques (`T####`) and Tactics (`TA####`) are intentionally
+NOT in the fingerprint.** They stay on the article entity payload and
+render in the UI, but they're excluded from clustering — the LLM
+over-extracts recon TTPs (`T1589` / `T1590` / `T1592` etc.) so they
+cause unrelated stories to falsely cluster.
 
-Why namespaces? So that the bag-of-words token `w:apple` can never
-collide with the company `com:apple` or a product `pro:apple`.
+Cluster identity is "anchored" on per-event identifiers (the columns
+marked above). Two articles must share at least one anchor token before
+similarity is even considered — see step 3 of the algorithm below.
+
+Tokens are lowercase. Why namespaces? So that the bag-of-words token
+`w:apple` can never collide with the company `com:apple` or a product
+`pro:apple`.
 
 ## The constellation algorithm
 
@@ -78,17 +86,18 @@ CONFIG: CLUSTER_WINDOW_DAYS, CLUSTER_MIN_SHARED, CLUSTER_SIM_THRESHOLD
 
 1. Insert A's tokens into article_tokens (inverted index).
 
-2. Find candidate articles via:
+2. Find candidate articles using ONLY A's anchor tokens (per-event IDs):
        SELECT article_id, COUNT(*) AS shared
          FROM article_tokens
-        WHERE token IN F
+        WHERE token IN anchors(F)
           AND article != A
           AND published_at > now() - CLUSTER_WINDOW_DAYS
         GROUP BY article_id
-       HAVING shared >= CLUSTER_MIN_SHARED
         ORDER BY shared DESC LIMIT 50
+   If A has no anchor tokens, A starts its own cluster -- no candidates.
 
 3. For each candidate C:
+       if anchors(F) ∩ anchors(tokens(C)) == ∅: skip   # anchor gate
        sim = weighted_jaccard(F, tokens(C))
        if sim < CLUSTER_SIM_THRESHOLD: skip
        cluster = articles(C).story_cluster_id

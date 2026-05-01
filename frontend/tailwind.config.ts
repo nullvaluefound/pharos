@@ -69,19 +69,21 @@ export default {
         // primarily by dark mode (deep navy surfaces + gold accents) but
         // available everywhere via `bg-pharos-navy-*` / `text-pharos-gold-*`.
         pharos: {
-          // Deep navy / near-black backgrounds in the brand mark
+          // Near-black surfaces with a subtle navy undertone (matches the
+          // brand mark's background plate). Pulled noticeably darker than
+          // a typical "dark navy" so cards feel inky, not blue.
           navy: {
-            50:  "#e7e9ee",
-            100: "#c2c8d5",
-            200: "#919bb1",
-            300: "#5b6a87",
-            400: "#2f3f60",
-            500: "#1a2742",
-            600: "#131c30",  // surface in dark mode
-            700: "#0f1828",  // card / sidebar in dark mode
-            800: "#0b1224",  // body bg in dark mode
-            900: "#070b18",
-            950: "#03060f",
+            50:  "#dadde3",
+            100: "#a9aebd",
+            200: "#717689",
+            300: "#3d4458",
+            400: "#1c2233",
+            500: "#10141f",  // border / divider in dark mode
+            600: "#0a0d16",  // hover surface in dark mode
+            700: "#070a11",  // card / sidebar / topbar in dark mode
+            800: "#04060c",  // body bg in dark mode
+            900: "#020308",
+            950: "#000000",
           },
           // Lighthouse-beam gold (accent)
           gold: {

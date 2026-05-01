@@ -5,7 +5,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b1224" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#04060c" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,18 +16,22 @@
     <title>Pharos — A beam through the noise</title>
     <meta name="description" content="Self-hosted threat intelligence feed reader." />
     <!--
-      Theme bootstrap: applies the saved (or system) preference BEFORE React
-      hydrates so the user never sees a flash of the wrong palette. Reads from
-      localStorage("pharos.theme"); falls back to prefers-color-scheme.
+      Theme bootstrap: applies the saved preference BEFORE React hydrates so
+      the user never sees a flash of the wrong palette. Reads from
+      localStorage("pharos.theme"). Default = dark (no system fallback).
     -->
     <script>
       (function () {
         try {
           var stored = localStorage.getItem("pharos.theme");
-          var systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          var dark = stored === "dark" || (stored !== "light" && systemDark);
+          var dark = stored !== "light";
+          if (stored === "system") {
+            dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          }
           if (dark) document.documentElement.classList.add("dark");
-        } catch (_) {}
+        } catch (_) {
+          document.documentElement.classList.add("dark");
+        }
       })();
     </script>
   </head>

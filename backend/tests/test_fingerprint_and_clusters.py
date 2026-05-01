@@ -1,4 +1,8 @@
-from pharos.lantern.constellations import shared_tokens, weighted_jaccard
+from pharos.lantern.constellations import (
+    has_anchor_overlap,
+    shared_tokens,
+    weighted_jaccard,
+)
 from pharos.lantern.fingerprint import build_fingerprint
 from pharos.lantern.schema import (
     CompanyEntity,
@@ -47,11 +51,13 @@ def test_fingerprint_is_deterministic_and_namespaced():
     fp2 = build_fingerprint(a, title="APT29 exploits Microsoft Exchange")
     assert fp1 == fp2
     assert "thr:apt29" in fp1
-    assert "mtg:g0016" in fp1                 # MITRE Group ID
+    assert "mtg:g0016" in fp1
     assert "cve:cve-2024-12345" in fp1
-    assert "ttp:t1566.001" in fp1
-    assert "ttp:t1566" in fp1                 # parent technique also added
     assert "com:microsoft" in fp1
+    # MITRE techniques and tactics are intentionally NOT in the fingerprint
+    # (see fingerprint.py docstring above NS_SECTOR).
+    assert not any(t.startswith("ttp:") for t in fp1)
+    assert not any(t.startswith("mta:") for t in fp1)
 
 
 def test_weighted_jaccard_prefers_high_signal_overlap():
@@ -76,6 +82,40 @@ def test_weighted_jaccard_prefers_high_signal_overlap():
     sim_far = weighted_jaccard(a, c)
     assert sim_near > sim_far
     assert sim_near > 0.4
+
+
+def test_anchor_overlap_required_for_clustering():
+    """Two articles with no per-event identifier in common must NOT cluster,
+    no matter how many topic/word tokens they share."""
+    a = make_article(
+        actors=[ThreatActorEntity(name="APT29", mitre_group_id="G0016")],
+        cves=["CVE-2024-12345"],
+    )
+    b = make_article(
+        actors=[ThreatActorEntity(name="Lazarus", mitre_group_id="G0032")],
+        cves=["CVE-2024-99999"],
+    )
+    fa = set(build_fingerprint(a, title="reconnaissance attacker phishing campaign"))
+    fb = set(build_fingerprint(b, title="reconnaissance attacker phishing campaign"))
+    assert not has_anchor_overlap(fa, fb)
+
+
+def test_anchor_overlap_succeeds_on_shared_cve():
+    a = make_article(cves=["CVE-2024-12345"], companies=["Microsoft"])
+    b = make_article(cves=["CVE-2024-12345"], companies=["Acme"])
+    fa = set(build_fingerprint(a, title="x"))
+    fb = set(build_fingerprint(b, title="y"))
+    assert has_anchor_overlap(fa, fb)
+
+
+def test_legacy_ttp_tokens_are_ignored_in_similarity():
+    """Stale ``ttp:`` rows in article_tokens (from before the refactor) must
+    not contribute to similarity or shared-token output."""
+    a = {"cve:cve-2024-12345", "thr:apt29", "ttp:t1566.001", "ttp:t1589"}
+    b = {"cve:cve-2024-12345", "thr:apt29", "ttp:t1566.001", "ttp:t1589"}
+    sim = weighted_jaccard(a, b)
+    assert sim == 1.0
+    assert all(not t.startswith("ttp:") for t in shared_tokens(a, b))
 
 
 def test_shared_tokens_orders_by_weight_desc():

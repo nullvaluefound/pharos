@@ -17,16 +17,14 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex h-full items-center justify-center bg-gradient-to-br from-ink-50 via-white to-beam-50 px-4">
+    <div className="flex h-full items-center justify-center bg-auth px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center">
           <img
-            src="/logo.png"
-            alt="Pharos"
-            className="mb-3 h-16 w-16 rounded-2xl shadow-lg ring-1 ring-ink-200/40 dark:ring-pharos-navy-500"
+            src="/branding.png"
+            alt="Pharos — A beam through the noise"
+            className="mb-2 w-full max-w-sm select-none drop-shadow-2xl"
           />
-          <h1 className="text-2xl font-bold tracking-tight">Welcome to Pharos</h1>
-          <p className="text-sm text-ink-500">A beam through the noise.</p>
         </div>
         <form onSubmit={submit} className="card space-y-4 p-6">
           <div>

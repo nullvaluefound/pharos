@@ -130,7 +130,7 @@ export function Sidebar() {
         <img
           src="/logo.png"
           alt="Pharos"
-          className="h-9 w-9 rounded-lg shadow-sm ring-1 ring-ink-200/40 dark:ring-pharos-navy-500"
+          className="h-9 w-9 select-none drop-shadow-md"
         />
         <div>
           <div className="font-semibold leading-none">Pharos</div>
