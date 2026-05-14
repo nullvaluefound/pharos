@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  CalendarClock,
+  Check,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -8,6 +10,10 @@ import {
   Eye,
   FileText,
   Loader2,
+  Mail,
+  Pause,
+  Pencil,
+  Play,
   Plus,
   Send,
   Sparkles,
@@ -27,6 +33,9 @@ import {
   type ReportListItem,
   type ReportPreview,
   type ReportRequest,
+  type ReportSchedule,
+  type ReportScheduleIn,
+  type ScheduleCadence,
 } from "../lib/types";
 import { timeAgo } from "../lib/format";
 
@@ -85,9 +94,16 @@ function toRequest(f: FormState): ReportRequest {
   };
 }
 
+interface EmailStatus {
+  email: string | null;
+  smtp_configured: boolean;
+}
+
 export function ReportsPage() {
   const qc = useQueryClient();
-  const [view, setView] = useState<"list" | "create" | "view">("list");
+  const [view, setView] = useState<
+    "list" | "create" | "view" | "schedules"
+  >("list");
   const [openId, setOpenId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [preview, setPreview] = useState<ReportPreview | null>(null);
@@ -102,6 +118,12 @@ export function ReportsPage() {
     queryKey: ["reports", openId],
     queryFn: () => api<ReportDetail>(`/reports/${openId}`),
     enabled: openId !== null && view === "view",
+  });
+
+  // Used to gate the "Email this report" / schedule-email controls.
+  const emailQ = useQuery<EmailStatus>({
+    queryKey: ["settings", "email"],
+    queryFn: () => api<EmailStatus>("/settings/email"),
   });
 
   // ---- mutations ----
@@ -177,9 +199,18 @@ export function ReportsPage() {
             title="Reports"
             subtitle="Generate threat-intel briefings from filtered articles."
             actions={
-              <button onClick={startNew} className="btn-primary">
-                <Plus className="h-4 w-4" /> New report
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setView("schedules")}
+                  className="btn-ghost"
+                  title="Recurring report schedules"
+                >
+                  <CalendarClock className="h-4 w-4" /> Schedules
+                </button>
+                <button onClick={startNew} className="btn-primary">
+                  <Plus className="h-4 w-4" /> New report
+                </button>
+              </div>
             }
           />
           <ReportList
@@ -191,6 +222,17 @@ export function ReportsPage() {
             }}
           />
         </>
+      )}
+
+      {view === "schedules" && (
+        <SchedulesView
+          onBack={() => setView("list")}
+          onOpenReport={(id) => {
+            setOpenId(id);
+            setView("view");
+          }}
+          emailStatus={emailQ.data}
+        />
       )}
 
       {view === "create" && (
@@ -213,6 +255,7 @@ export function ReportsPage() {
         <ReportView
           detail={detailQ.data}
           loading={detailQ.isLoading}
+          emailStatus={emailQ.data}
           onBack={() => setView("list")}
           onDelete={() => {
             if (openId && confirm("Delete this report?")) {
@@ -796,20 +839,26 @@ function MetadataFilters({
 function ReportView({
   detail,
   loading,
+  emailStatus,
   onBack,
   onDelete,
 }: {
   detail?: ReportDetail;
   loading: boolean;
+  emailStatus?: EmailStatus;
   onBack: () => void;
   onDelete: () => void;
 }) {
+  const [emailing, setEmailing] = useState(false);
+
   if (loading || !detail) {
     return (
       <div className="card mt-6 h-96 animate-pulse bg-ink-100/50" />
     );
   }
   const meta = `${detail.article_count} articles · ${detail.audience} · ${detail.length_target} · ${detail.structure_kind}${detail.cost_usd != null ? ` · $${detail.cost_usd.toFixed(3)}` : ""}`;
+  const canEmail =
+    detail.status === "ready" && !!emailStatus?.smtp_configured;
   return (
     <>
       <PageHeader
@@ -822,12 +871,35 @@ function ReportView({
             </button>
             <CopyBtn text={detail.body_md} />
             <DownloadBtn name={detail.name} text={detail.body_md} />
+            <button
+              onClick={() => setEmailing(true)}
+              disabled={!canEmail}
+              className="btn-secondary"
+              title={
+                !emailStatus?.smtp_configured
+                  ? "SMTP is not configured on this Pharos server"
+                  : detail.status !== "ready"
+                    ? "Report must be ready to email"
+                    : "Send this report by email"
+              }
+            >
+              <Mail className="h-4 w-4" /> Email
+            </button>
             <button onClick={onDelete} className="btn-ghost text-danger-600">
               <Trash2 className="h-4 w-4" /> Delete
             </button>
           </div>
         }
       />
+
+      {emailing && (
+        <EmailReportModal
+          reportId={detail.id}
+          reportName={detail.name}
+          defaultTo={emailStatus?.email || ""}
+          onClose={() => setEmailing(false)}
+        />
+      )}
 
       {detail.status === "failed" ? (
         <div className="card border-danger-200 bg-danger-50 p-5">
@@ -924,4 +996,704 @@ function DownloadBtn({ name, text }: { name: string; text: string }) {
       <Download className="h-4 w-4" /> .md
     </button>
   );
+}
+
+// =============================================================================
+// Ad-hoc email modal
+// =============================================================================
+function EmailReportModal({
+  reportId,
+  reportName,
+  defaultTo,
+  onClose,
+}: {
+  reportId: number;
+  reportName: string;
+  defaultTo: string;
+  onClose: () => void;
+}) {
+  const [to, setTo] = useState(defaultTo);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const send = useMutation({
+    mutationFn: () =>
+      api<{ ok: boolean; sent_to: string }>(`/reports/${reportId}/email`, {
+        method: "POST",
+        body: JSON.stringify({ to: to.trim() || null }),
+      }),
+    onSuccess: (r) =>
+      setMsg({ ok: true, text: `Sent to ${r.sent_to}.` }),
+    onError: (e: any) =>
+      setMsg({ ok: false, text: e?.message || "Send failed" }),
+  });
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="card w-full max-w-md p-5"
+      >
+        <div className="mb-3 flex items-start justify-between">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-ink-400">
+              Email report
+            </div>
+            <div className="mt-0.5 text-sm font-semibold text-ink-900">
+              {reportName}
+            </div>
+          </div>
+          <button onClick={onClose} className="btn-ghost !py-1">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <label className="mb-1 block text-xs font-semibold text-ink-700">
+          Send to
+        </label>
+        <input
+          type="email"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder="you@example.com"
+          className="input w-full"
+        />
+        <p className="mt-1 text-[11px] text-ink-500">
+          Defaults to your saved notification email. Override here to send a
+          one-off copy without changing your saved address.
+        </p>
+
+        {msg && (
+          <div
+            className={
+              "mt-3 rounded-lg border px-3 py-2 text-sm " +
+              (msg.ok
+                ? "border-good-100 bg-good-50 text-good-600"
+                : "border-danger-100 bg-danger-50 text-danger-600")
+            }
+          >
+            {msg.text}
+          </div>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onClose} className="btn-ghost">
+            Close
+          </button>
+          <button
+            onClick={() => {
+              setMsg(null);
+              send.mutate();
+            }}
+            disabled={send.isPending || !to.trim()}
+            className="btn-primary"
+          >
+            <Send className="h-4 w-4" />
+            {send.isPending ? "Sending…" : "Send"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// Schedules view (recurring reports)
+// =============================================================================
+function SchedulesView({
+  onBack,
+  onOpenReport,
+  emailStatus,
+}: {
+  onBack: () => void;
+  onOpenReport: (id: number) => void;
+  emailStatus?: EmailStatus;
+}) {
+  const qc = useQueryClient();
+  const listQ = useQuery<ReportSchedule[]>({
+    queryKey: ["report-schedules"],
+    queryFn: () => api<ReportSchedule[]>("/report-schedules"),
+  });
+  const [editing, setEditing] = useState<ReportSchedule | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const setActive = useMutation({
+    mutationFn: (s: ReportSchedule) =>
+      api<ReportSchedule>(`/report-schedules/${s.id}`, {
+        method: "PUT",
+        body: JSON.stringify(scheduleToIn({ ...s, active: !s.active })),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["report-schedules"] }),
+  });
+  const del = useMutation({
+    mutationFn: (id: number) =>
+      api(`/report-schedules/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["report-schedules"] }),
+  });
+  const runNow = useMutation({
+    mutationFn: (id: number) =>
+      api(`/report-schedules/${id}/run-now`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["report-schedules"] }),
+  });
+
+  return (
+    <>
+      <PageHeader
+        title="Recurring reports"
+        subtitle="Pharos will generate these on a cadence and (optionally) email them to you."
+        actions={
+          <div className="flex gap-2">
+            <button onClick={onBack} className="btn-ghost">
+              <ChevronLeft className="h-4 w-4" /> Back to history
+            </button>
+            <button
+              onClick={() => setCreating(true)}
+              className="btn-primary"
+            >
+              <Plus className="h-4 w-4" /> New schedule
+            </button>
+          </div>
+        }
+      />
+
+      {emailStatus && !emailStatus.smtp_configured && (
+        <div className="card mb-4 border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
+          SMTP isn't configured on this server, so scheduled reports will be
+          generated and saved but won't be emailed. Ask your administrator to
+          set <code>SMTP_HOST</code> in <code>.env</code>.
+        </div>
+      )}
+
+      {listQ.isLoading ? (
+        <div className="card h-40 animate-pulse bg-ink-100/50" />
+      ) : (listQ.data || []).length === 0 ? (
+        <Empty
+          icon={CalendarClock}
+          title="No schedules yet"
+          hint="Click 'New schedule' to set up a recurring report."
+        />
+      ) : (
+        <ul className="space-y-2">
+          {(listQ.data || []).map((s) => (
+            <li
+              key={s.id}
+              className="card flex flex-wrap items-center gap-3 p-3"
+            >
+              <CalendarClock
+                className={
+                  "h-5 w-5 flex-shrink-0 " +
+                  (s.active ? "text-beam-500" : "text-ink-300")
+                }
+              />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-ink-900">
+                  {s.name}
+                </div>
+                <div className="text-[11px] text-ink-500">
+                  {describeCadence(s)} ·{" "}
+                  {s.email_to
+                    ? `email → ${s.email_to}`
+                    : emailStatus?.email
+                      ? `email → ${emailStatus.email}`
+                      : "email off"}
+                  {s.next_run_at && s.active && (
+                    <> · next: {formatUtcLocal(s.next_run_at)}</>
+                  )}
+                </div>
+                {s.last_error && (
+                  <div className="mt-0.5 truncate text-[11px] text-danger-600">
+                    Last error: {s.last_error}
+                  </div>
+                )}
+                {s.last_report_id && !s.last_error && (
+                  <button
+                    onClick={() => onOpenReport(s.last_report_id!)}
+                    className="mt-0.5 text-[11px] text-beam-600 hover:underline"
+                  >
+                    Open last report &rarr;
+                  </button>
+                )}
+              </div>
+              <span className={"chip " + (s.active ? "chip-green" : "")}>
+                {s.active ? "active" : "paused"}
+              </span>
+              <button
+                onClick={() => runNow.mutate(s.id)}
+                disabled={runNow.isPending || !s.active}
+                className="btn-ghost !py-1"
+                title={
+                  s.active
+                    ? "Run on the next worker tick (~1 min)"
+                    : "Activate the schedule first"
+                }
+              >
+                <Play className="h-4 w-4" /> Run now
+              </button>
+              <button
+                onClick={() => setActive.mutate(s)}
+                className="btn-ghost !py-1"
+                title={s.active ? "Pause" : "Resume"}
+              >
+                {s.active ? (
+                  <Pause className="h-4 w-4" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+              </button>
+              <button
+                onClick={() => setEditing(s)}
+                className="btn-ghost !py-1"
+                title="Edit"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm(`Delete schedule "${s.name}"?`)) del.mutate(s.id);
+                }}
+                className="btn-ghost !py-1 text-danger-600"
+                title="Delete"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {(creating || editing) && (
+        <ScheduleEditor
+          existing={editing || undefined}
+          emailStatus={emailStatus}
+          onClose={() => {
+            setCreating(false);
+            setEditing(null);
+          }}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ["report-schedules"] });
+            setCreating(false);
+            setEditing(null);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function scheduleToIn(s: ReportSchedule): ReportScheduleIn {
+  return {
+    name: s.name,
+    request: s.request,
+    cadence: s.cadence,
+    hour_utc: s.hour_utc,
+    day_of_week: s.day_of_week,
+    day_of_month: s.day_of_month,
+    email_to: s.email_to,
+    active: s.active,
+  };
+}
+
+function describeCadence(s: ReportSchedule): string {
+  const time = `${String(s.hour_utc).padStart(2, "0")}:00 UTC`;
+  if (s.cadence === "daily") return `Every day at ${time}`;
+  if (s.cadence === "weekly") {
+    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    return `Every ${days[s.day_of_week ?? 0]} at ${time}`;
+  }
+  return `Day ${s.day_of_month ?? 1} of each month at ${time}`;
+}
+
+function formatUtcLocal(iso: string): string {
+  // Backend stores naive UTC; append Z so the JS Date parses correctly.
+  const t = iso.endsWith("Z") || /[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + "Z";
+  const d = new Date(t.replace(" ", "T"));
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Schedule editor modal -- minimal form: pick cadence + a saved request
+// ---------------------------------------------------------------------------
+function ScheduleEditor({
+  existing,
+  emailStatus,
+  onClose,
+  onSaved,
+}: {
+  existing?: ReportSchedule;
+  emailStatus?: EmailStatus;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  // We reuse the same FormState shape the create-view uses for the
+  // ReportRequest so the user fills in one familiar form.
+  const [name, setName] = useState(existing?.name || "Weekly Threat Briefing");
+  const [reqForm, setReqForm] = useState<FormState>(() =>
+    existing ? requestToFormState(existing.request, existing.name) : DEFAULT_FORM,
+  );
+  const [cadence, setCadence] = useState<ScheduleCadence>(
+    existing?.cadence || "weekly",
+  );
+  const [hour, setHour] = useState<number>(existing?.hour_utc ?? 13);
+  const [dow, setDow] = useState<number>(existing?.day_of_week ?? 0);
+  const [dom, setDom] = useState<number>(existing?.day_of_month ?? 1);
+  const [emailOverride, setEmailOverride] = useState<string>(
+    existing?.email_to || "",
+  );
+  const [active, setActive] = useState<boolean>(existing?.active ?? true);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = useMutation({
+    mutationFn: () => {
+      const payload: ReportScheduleIn = {
+        name,
+        request: toRequest(reqForm),
+        cadence,
+        hour_utc: hour,
+        day_of_week: cadence === "weekly" ? dow : null,
+        day_of_month: cadence === "monthly" ? dom : null,
+        email_to: emailOverride.trim() || null,
+        active,
+      };
+      const path = existing
+        ? `/report-schedules/${existing.id}`
+        : "/report-schedules";
+      return api<ReportSchedule>(path, {
+        method: existing ? "PUT" : "POST",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: onSaved,
+    onError: (e: any) => setErr(e?.message || "Save failed"),
+  });
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-12"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="card w-full max-w-3xl p-5"
+      >
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-ink-400">
+              {existing ? "Edit schedule" : "New schedule"}
+            </div>
+            <div className="mt-0.5 text-sm text-ink-500">
+              Pharos will generate the report on this cadence and (if email is
+              configured) send it to your inbox.
+            </div>
+          </div>
+          <button onClick={onClose} className="btn-ghost !py-1">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-700">
+              Schedule name
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input w-full"
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-ink-700">
+                Cadence
+              </label>
+              <select
+                value={cadence}
+                onChange={(e) => setCadence(e.target.value as ScheduleCadence)}
+                className="input w-full"
+              >
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-ink-700">
+                Hour (UTC)
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={23}
+                value={hour}
+                onChange={(e) =>
+                  setHour(Math.max(0, Math.min(23, +e.target.value || 0)))
+                }
+                className="input w-full"
+              />
+            </div>
+            {cadence === "weekly" && (
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-ink-700">
+                  Day of week
+                </label>
+                <select
+                  value={dow}
+                  onChange={(e) => setDow(+e.target.value)}
+                  className="input w-full"
+                >
+                  <option value={0}>Monday</option>
+                  <option value={1}>Tuesday</option>
+                  <option value={2}>Wednesday</option>
+                  <option value={3}>Thursday</option>
+                  <option value={4}>Friday</option>
+                  <option value={5}>Saturday</option>
+                  <option value={6}>Sunday</option>
+                </select>
+              </div>
+            )}
+            {cadence === "monthly" && (
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-ink-700">
+                  Day of month
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={dom}
+                  onChange={(e) =>
+                    setDom(Math.max(1, Math.min(28, +e.target.value || 1)))
+                  }
+                  className="input w-full"
+                />
+                <div className="mt-1 text-[10px] text-ink-400">
+                  Capped at 28 so every month is valid.
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-700">
+              Email override <span className="text-ink-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="email"
+              value={emailOverride}
+              onChange={(e) => setEmailOverride(e.target.value)}
+              placeholder="you@example.com"
+              className="input w-full"
+            />
+            <p className="mt-1 text-[11px] text-ink-500">
+              Leave blank to send to your saved notification email. Useful if a
+              specific schedule should land in a shared inbox.
+            </p>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={(e) => setActive(e.target.checked)}
+              className="h-4 w-4 rounded border-ink-300 text-beam-600 focus:ring-beam-500"
+            />
+            Active (run on cadence)
+          </label>
+
+          <details className="rounded-lg border border-ink-200 bg-ink-50 p-3 dark:bg-pharos-navy-900/30">
+            <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-ink-500">
+              Report content
+            </summary>
+            <div className="mt-3 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-ink-700">
+                  Title (used as the saved report's name)
+                </label>
+                <input
+                  value={reqForm.name}
+                  onChange={(e) =>
+                    setReqForm({ ...reqForm, name: e.target.value })
+                  }
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-ink-700">
+                  Keywords (OR; comma- or newline-separated)
+                </label>
+                <textarea
+                  value={reqForm.keywords}
+                  onChange={(e) =>
+                    setReqForm({ ...reqForm, keywords: e.target.value })
+                  }
+                  className="input min-h-[60px] w-full"
+                  placeholder="ransomware, Volt Typhoon, CVE-2024-3400"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-ink-700">
+                    Lookback (days)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={reqForm.since_days}
+                    onChange={(e) =>
+                      setReqForm({
+                        ...reqForm,
+                        since_days: Math.max(1, +e.target.value || 7),
+                      })
+                    }
+                    className="input !w-28"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-ink-700">
+                    Audience
+                  </label>
+                  <select
+                    value={reqForm.audience}
+                    onChange={(e) =>
+                      setReqForm({
+                        ...reqForm,
+                        audience: e.target.value as FormState["audience"],
+                      })
+                    }
+                    className="input"
+                  >
+                    <option value="executive">Executive</option>
+                    <option value="technical">Technical</option>
+                    <option value="both">Both</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-ink-700">
+                    Length
+                  </label>
+                  <select
+                    value={reqForm.length}
+                    onChange={(e) =>
+                      setReqForm({
+                        ...reqForm,
+                        length: e.target.value as FormState["length"],
+                      })
+                    }
+                    className="input"
+                  >
+                    <option value="short">Short (1-2 pp)</option>
+                    <option value="medium">Medium (2-3 pp)</option>
+                    <option value="long">Long (3-4 pp)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-ink-700">
+                    Structure
+                  </label>
+                  <select
+                    value={reqForm.structure_kind}
+                    onChange={(e) =>
+                      setReqForm({
+                        ...reqForm,
+                        structure_kind: e.target
+                          .value as FormState["structure_kind"],
+                      })
+                    }
+                    className="input"
+                  >
+                    <option value="BLUF">BLUF (default)</option>
+                    <option value="custom">Custom sections</option>
+                  </select>
+                </div>
+              </div>
+              {reqForm.structure_kind === "custom" && (
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-ink-700">
+                    Custom sections (one per line)
+                  </label>
+                  <textarea
+                    value={reqForm.sections}
+                    onChange={(e) =>
+                      setReqForm({ ...reqForm, sections: e.target.value })
+                    }
+                    className="input min-h-[80px] w-full font-mono text-xs"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-ink-700">
+                  Scope note (optional)
+                </label>
+                <textarea
+                  value={reqForm.scope_note}
+                  onChange={(e) =>
+                    setReqForm({ ...reqForm, scope_note: e.target.value })
+                  }
+                  className="input min-h-[50px] w-full"
+                />
+              </div>
+              <div className="text-[11px] italic text-ink-500">
+                Tip: build &amp; preview your filter as a one-off in "New
+                report" first. The schedule reuses the same engine.
+              </div>
+            </div>
+          </details>
+        </div>
+
+        {err && (
+          <div className="mt-3 rounded-lg border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-600">
+            {err}
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="btn-ghost">
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              setErr(null);
+              save.mutate();
+            }}
+            disabled={save.isPending || !name.trim() || !reqForm.name.trim()}
+            className="btn-primary"
+          >
+            <Check className="h-4 w-4" />
+            {save.isPending
+              ? "Saving…"
+              : existing
+                ? "Save changes"
+                : "Create schedule"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function requestToFormState(req: ReportRequest, fallbackName: string): FormState {
+  return {
+    name: req.name || fallbackName,
+    keywords: (req.keywords || []).join(", "),
+    since_days: req.since_days || 7,
+    rows: Object.entries(req.any_of || {}).flatMap(([type, names]) =>
+      (names || []).map((name) => ({ type, name })),
+    ),
+    has_types: req.has_entity_types || [],
+    structure_kind: req.structure_kind || "BLUF",
+    sections: (req.sections || []).join("\n"),
+    audience: req.audience || "both",
+    length: req.length || "short",
+    scope_note: req.scope_note || "",
+  };
 }

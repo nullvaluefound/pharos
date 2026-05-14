@@ -17,6 +17,11 @@ from .generator import (
     estimate_cost,
     generate_report,
 )
+from .scheduler import (
+    compute_next_run_at,
+    initialize_next_run_at,
+    run_due_schedules,
+)
 
 __all__ = [
     "MAX_ARTICLES",
@@ -26,4 +31,7 @@ __all__ = [
     "count_articles_in_scope",
     "estimate_cost",
     "generate_report",
+    "compute_next_run_at",
+    "initialize_next_run_at",
+    "run_due_schedules",
 ]

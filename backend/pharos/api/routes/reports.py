@@ -18,6 +18,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from ...notifier import email as mailer
 from ...reports import (
     MAX_ARTICLES,
     ReportRequest,
@@ -26,6 +27,7 @@ from ...reports import (
     estimate_cost,
     generate_report,
 )
+from ...reports.email_render import render_report_email
 from ...reports.prompts import length_targets
 from ..deps import CurrentUser, get_current_user, get_db
 
@@ -156,6 +158,87 @@ def delete_report(report_id: int,
     conn.commit()
     if cur.rowcount == 0:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Report not found")
+
+
+# ---------------------------------------------------------------------------
+# Ad-hoc email: ship a finished report to the user's notification address.
+# ---------------------------------------------------------------------------
+class ReportEmailIn(BaseModel):
+    # Optional override -- if omitted we send to the user's saved
+    # notification email. Useful for "send a copy to my colleague"
+    # without having to change the saved address.
+    to: str | None = Field(default=None, max_length=320)
+
+
+class ReportEmailOut(BaseModel):
+    ok: bool
+    sent_to: str
+
+
+@router.post("/{report_id}/email", response_model=ReportEmailOut)
+def email_report(report_id: int,
+                 data: ReportEmailIn,
+                 user: CurrentUser = Depends(get_current_user),
+                 conn: sqlite3.Connection = Depends(get_db)) -> ReportEmailOut:
+    """Email a finished report to the user (or an explicit override
+    address). Requires SMTP to be configured server-side.
+
+    Reports must be in ``status='ready'`` -- we don't email skeletons or
+    failed runs.
+    """
+    if not mailer.is_smtp_configured():
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "SMTP is not configured on this Pharos server.",
+        )
+
+    row = conn.execute(
+        """
+        SELECT r.id, r.name, r.audience, r.structure_kind, r.length_target,
+               r.article_count, r.status, r.cost_usd, r.body_md,
+               u.email AS user_email
+          FROM reports r
+          JOIN users u ON u.id = r.user_id
+         WHERE r.id = ? AND r.user_id = ?
+        """,
+        (report_id, user.id),
+    ).fetchone()
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Report not found")
+    if row["status"] != "ready":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Report is not ready (status='{row['status']}')",
+        )
+
+    # Pick the destination: explicit override > saved user email.
+    raw = (data.to or row["user_email"] or "").strip()
+    if not mailer.is_valid_email(raw):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "No valid destination email. Set one on the Settings page or "
+            "provide `to` in the request.",
+        )
+
+    subject, text, html = render_report_email(
+        report_name=row["name"],
+        report_id=row["id"],
+        body_md=row["body_md"] or "",
+        audience=row["audience"],
+        length_target=row["length_target"],
+        structure_kind=row["structure_kind"],
+        article_count=int(row["article_count"] or 0),
+        cost_usd=row["cost_usd"],
+    )
+    try:
+        mailer.send_email(to=raw, subject=subject, text=text, html=html)
+    except Exception as e:
+        log.warning("ad-hoc report email failed for report=%s: %s", report_id, e)
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            f"SMTP relay rejected the message: {e}",
+        )
+    return ReportEmailOut(ok=True, sent_to=raw)
 
 
 @router.post("/preview", response_model=ReportPreviewOut)

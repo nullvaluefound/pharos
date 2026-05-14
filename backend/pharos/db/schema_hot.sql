@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_admin        INTEGER NOT NULL DEFAULT 0,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     settings_json   TEXT NOT NULL DEFAULT '{}'
+    -- Migration 0004 adds: email TEXT
 );
 
 -- ---------------------------------------------------------------------------
@@ -189,6 +190,7 @@ CREATE TABLE IF NOT EXISTS saved_searches (
     name        TEXT NOT NULL,
     query_json  TEXT NOT NULL,
     notify      INTEGER NOT NULL DEFAULT 0,
+    -- Migration 0004 adds: notify_email INTEGER NOT NULL DEFAULT 0
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -205,6 +207,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     title       TEXT NOT NULL,
     body        TEXT,
     is_read     INTEGER NOT NULL DEFAULT 0,
+    -- Migration 0004 adds: email_sent_at DATETIME
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, watch_id, article_id)
 );

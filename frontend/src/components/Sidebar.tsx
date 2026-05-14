@@ -176,26 +176,28 @@ export function Sidebar() {
           }
         />
         {!collapsed["watches"] && (
-          <div className="space-y-0.5">
-            {watches && watches.length > 0 ? (
-              watches.map((w) => (
-                <Link
-                  key={w.id}
-                  to={`/stream?watch=${w.id}`}
-                  className={navItemClass(String(w.id) === activeWatch)}
-                >
-                  <Eye className="h-4 w-4 flex-shrink-0 text-ink-400" />
-                  <span className="truncate">{w.name}</span>
-                </Link>
-              ))
-            ) : (
-              <div className="px-3 py-2 text-xs text-ink-400">
-                No watches yet.{" "}
-                <Link to="/watches" className="text-beam-600 hover:underline">
-                  Create one
-                </Link>
-              </div>
-            )}
+          <div className="rounded-md border border-ink-200 bg-ink-100/70 p-1 dark:border-pharos-navy-500 dark:bg-pharos-navy-600">
+            <div className="max-h-48 space-y-0.5 overflow-y-auto pr-1 sidebar-scroll">
+              {watches && watches.length > 0 ? (
+                watches.map((w) => (
+                  <Link
+                    key={w.id}
+                    to={`/stream?watch=${w.id}`}
+                    className={navItemClass(String(w.id) === activeWatch)}
+                  >
+                    <Eye className="h-4 w-4 flex-shrink-0 text-ink-400" />
+                    <span className="truncate">{w.name}</span>
+                  </Link>
+                ))
+              ) : (
+                <div className="px-3 py-2 text-xs text-ink-400">
+                  No watches yet.{" "}
+                  <Link to="/watches" className="text-beam-600 hover:underline">
+                    Create one
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -234,7 +236,8 @@ export function Sidebar() {
           </form>
         )}
 
-        <div className="space-y-0.5">
+        <div className="rounded-md border border-ink-200 bg-ink-100/70 p-1 dark:border-pharos-navy-500 dark:bg-pharos-navy-600">
+        <div className="max-h-80 space-y-0.5 overflow-y-auto pr-1 sidebar-scroll">
           {grouped.map(([folder, list]) => {
             const key = `folder:${folder}`;
             const isCollapsed = collapsed[key] !== false; // default collapsed
@@ -302,6 +305,7 @@ export function Sidebar() {
               </div>
             );
           })}
+        </div>
         </div>
       </nav>
 

@@ -66,6 +66,27 @@ class Settings(BaseSettings):
     # links and redirects know the public prefix.
     root_path: str = Field(default="")
 
+    # Public-facing base URL of the SPA (e.g. "https://omnoptikon.com").
+    # Used to build clickable article links inside notification emails.
+    # When empty the digest still goes out, but with relative paths only.
+    pharos_public_url: str = Field(default="")
+
+    # SMTP delivery for watch-match digest emails. All optional: when
+    # smtp_host is empty the notifier silently skips the email step (the
+    # in-app `notifications` rows are still created as before).
+    smtp_host: str = Field(default="")
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_user: str = Field(default="")
+    smtp_password: str = Field(default="")
+    # The "From:" header the digest will be sent as. Defaults to smtp_user
+    # if left blank; many SMTP relays require From == authenticated user.
+    smtp_from: str = Field(default="")
+    # Implicit TLS (e.g. port 465). Otherwise we STARTTLS on plain SMTP.
+    smtp_use_ssl: bool = Field(default=False)
+    # Disable STARTTLS (only for local relays / dev). Default is to upgrade
+    # the connection unless this is set true.
+    smtp_skip_starttls: bool = Field(default=False)
+
     # Logging
     log_level: str = Field(default="INFO")
 

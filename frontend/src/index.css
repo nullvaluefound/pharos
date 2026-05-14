@@ -114,6 +114,15 @@
 .dark ::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.10); }
 .dark ::-webkit-scrollbar-thumb:hover { background: rgb(244 184 74 / 0.35); }
 
+/* Slimmer scrollbar for nested scroll panels (sidebar Watches / Feed groups).
+   Keeps the inset list feeling inset rather than reusing the page-scale 8px
+   bar inside a small panel. */
+.sidebar-scroll { scrollbar-width: thin; scrollbar-color: rgb(0 0 0 / 0.18) transparent; }
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: rgb(0 0 0 / 0.18); }
+.dark .sidebar-scroll { scrollbar-color: rgb(255 255 255 / 0.12) transparent; }
+.dark .sidebar-scroll::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.12); }
+
 /* ---------------------------------------------------------------------------
  * Dark-mode overrides for raw Tailwind classes scattered across components.
  *

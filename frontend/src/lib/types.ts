@@ -86,6 +86,7 @@ export interface WatchOut {
   name: string;
   query: any;
   notify: boolean;
+  notify_email: boolean;
   created_at: string;
 }
 
@@ -233,6 +234,36 @@ export interface ReportRequest {
   audience: "executive" | "technical" | "both";
   length: "short" | "medium" | "long";
   scope_note: string;
+}
+
+export type ScheduleCadence = "daily" | "weekly" | "monthly";
+
+export interface ReportSchedule {
+  id: number;
+  name: string;
+  request: ReportRequest;
+  cadence: ScheduleCadence;
+  hour_utc: number;
+  day_of_week: number | null;   // 0=Mon..6=Sun, weekly only
+  day_of_month: number | null;  // 1..28, monthly only
+  email_to: string | null;
+  active: boolean;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  last_report_id: number | null;
+  last_error: string | null;
+  created_at: string;
+}
+
+export interface ReportScheduleIn {
+  name: string;
+  request: ReportRequest;
+  cadence: ScheduleCadence;
+  hour_utc: number;
+  day_of_week?: number | null;
+  day_of_month?: number | null;
+  email_to?: string | null;
+  active: boolean;
 }
 
 export const HAS_METADATA_OPTIONS = [

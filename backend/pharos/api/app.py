@@ -17,6 +17,7 @@ from .routes import (
     metrics,
     notifications,
     opml,
+    report_schedules,
     reports,
     search,
     settings as settings_route,
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(settings_route.router, prefix=api_prefix)
     app.include_router(admin.router, prefix=api_prefix)
     app.include_router(reports.router, prefix=api_prefix)
+    app.include_router(report_schedules.router, prefix=api_prefix)
 
     @app.get("/healthz", tags=["meta"])
     def health() -> dict:
